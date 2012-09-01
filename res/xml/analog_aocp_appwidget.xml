@@ -18,8 +18,8 @@
     android:minWidth="110dip"
     android:minHeight="110dip"
     android:updatePeriodMillis="0"
-    android:previewImage="@drawable/preview_aokp"
-    android:initialLayout="@layout/analog_aokp_appwidget"
-    android:configure="com.android.alarmclock.AnalogAOKPAppWidgetConfigure"
+    android:previewImage="@drawable/preview_aocp"
+    android:initialLayout="@layout/analog_aocp_appwidget"
+    android:configure="com.android.alarmclock.AnalogAOCPAppWidgetConfigure"
     >
 </appwidget-provider>

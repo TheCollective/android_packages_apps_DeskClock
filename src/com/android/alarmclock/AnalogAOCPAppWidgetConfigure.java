@@ -24,14 +24,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 
-public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterView.OnItemSelectedListener,
+public class AnalogAOCPAppWidgetConfigure extends Activity implements AdapterView.OnItemSelectedListener,
         OnClickListener {
     private static final boolean DEBUG = false;
 
-    private static final String LOG_TAG = "AnalogAOKPAppWidgetConfigure";
+    private static final String LOG_TAG = "AnalogAOCPAppWidgetConfigure";
 
     private static final String PREFS_NAME
-            = "com.android.alarmclock.AnalogAOKPAppWidget";
+            = "com.android.alarmclock.AnalogAOCPAppWidget";
 
     private static final String PREF_PREFIX_KEY = "clock_style_";
 
@@ -44,7 +44,7 @@ public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterVie
 
     private ArrayList<Integer> mImages;
 
-    public AnalogAOKPAppWidgetConfigure() {
+    public AnalogAOCPAppWidgetConfigure() {
         super();
     }
 
@@ -60,7 +60,7 @@ public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterVie
 
         findClockDials();
 
-        setContentView(R.layout.analog_aokp_appwidget_config);
+        setContentView(R.layout.analog_aocp_appwidget_config);
 
         galleryClockStyle = (Gallery) findViewById(R.id.gallerySelectBackground);
         galleryClockStyle.setAdapter(new ImageAdapter(this));
@@ -98,7 +98,7 @@ public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterVie
         final Resources resources = getResources();
         final String packageName = getApplication().getPackageName();
 
-        addClockDials(resources, packageName, R.array.aokp_clock_backgrounds_drawable);
+        addClockDials(resources, packageName, R.array.aocp_clock_backgrounds_drawable);
     }
 
     private void addClockDials(Resources resources, String packageName, int list) {
@@ -150,7 +150,7 @@ public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterVie
     private class ImageAdapter extends BaseAdapter {
         private LayoutInflater mLayoutInflater;
 
-        ImageAdapter(AnalogAOKPAppWidgetConfigure context) {
+        ImageAdapter(AnalogAOCPAppWidgetConfigure context) {
             mLayoutInflater = context.getLayoutInflater();
         }
 
@@ -170,7 +170,7 @@ public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterVie
             ImageView image;
 
             if (convertView == null) {
-                image = (ImageView) mLayoutInflater.inflate(R.layout.analog_aokp_appwidget_config_dial_item, parent, false);
+                image = (ImageView) mLayoutInflater.inflate(R.layout.analog_aocp_appwidget_config_dial_item, parent, false);
             } else {
                 image = (ImageView) convertView;
             }
@@ -193,7 +193,7 @@ public class AnalogAOKPAppWidgetConfigure extends Activity implements AdapterVie
         saveClockPref(this, mAppWidgetId, selectedPos);
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(this);
 
-        AnalogAOKPAppWidgetProvider.updateAppWidget(this, appWidgetManager,
+        AnalogAOCPAppWidgetProvider.updateAppWidget(this, appWidgetManager,
             mAppWidgetId, mImages.get(selectedPos));
 
         Intent resultValue = new Intent();

@@ -31,10 +31,10 @@ import android.widget.RemoteViews;
 /**
  * Simple widget to show analog clock.
  */
-public class AnalogAOKPAppWidgetProvider extends AppWidgetProvider {
+public class AnalogAOCPAppWidgetProvider extends AppWidgetProvider {
     private static final boolean DEBUG = false;
 
-    static final String TAG = "AnalogAOKPAppWidgetProvider";
+    static final String TAG = "AnalogAOCPAppWidgetProvider";
 
     static String[] clockStyleDrawables;
 
@@ -44,10 +44,10 @@ public class AnalogAOKPAppWidgetProvider extends AppWidgetProvider {
 
         final int N = appWidgetIds.length;
 
-        clockStyleDrawables = context.getResources().getStringArray(R.array.aokp_clock_backgrounds_drawable);
+        clockStyleDrawables = context.getResources().getStringArray(R.array.aocp_clock_backgrounds_drawable);
 
         for (int i=0; i<N; i++) {
-            int selectedPos = AnalogAOKPAppWidgetConfigure.loadClockPref(context, appWidgetIds[i]);
+            int selectedPos = AnalogAOCPAppWidgetConfigure.loadClockPref(context, appWidgetIds[i]);
 
             int resID = context.getResources().getIdentifier(clockStyleDrawables[selectedPos], "drawable",
                 context.getPackageName());
@@ -62,7 +62,7 @@ public class AnalogAOKPAppWidgetProvider extends AppWidgetProvider {
 
         final int N = appWidgetIds.length;
         for (int i=0; i<N; i++) {
-            AnalogAOKPAppWidgetConfigure.deleteClockPref(context, appWidgetIds[i]);
+            AnalogAOCPAppWidgetConfigure.deleteClockPref(context, appWidgetIds[i]);
         }
     }
 
@@ -81,9 +81,9 @@ public class AnalogAOKPAppWidgetProvider extends AppWidgetProvider {
         if (DEBUG) Log.d(TAG, "updateAppWidget appWidgetId=" + appWidgetId);
 
         RemoteViews views = new RemoteViews(context.getPackageName(),
-            R.layout.analog_aokp_appwidget);
+            R.layout.analog_aocp_appwidget);
 
-        views.setOnClickPendingIntent(R.id.analog_aokp_appwidget,
+        views.setOnClickPendingIntent(R.id.analog_aocp_appwidget,
                 PendingIntent.getActivity(context, 0,
                     new Intent(context, AlarmClock.class), 0));
 

@@ -148,10 +148,10 @@
     <!-- Label for analog clock gadget, shown in list of all gadgets -->
     <string name="analog_gadget">Analog clock</string>
 
-    <!-- Label for AOKP clock gadget, shown in list of all gadgets -->
-    <string name="analog_aokp_gadget">AOKP clock</string>
+    <!-- Label for AOCP clock gadget, shown in list of all gadgets -->
+    <string name="analog_aocp_gadget">AOCP clock</string>
     
-    <!-- Appears at the top of the AOKP Clock Picker screen: Tell user to
+    <!-- Appears at the top of the AOCP Clock Picker screen: Tell user to
          select a clock Dial to display -->
     <string name="clock_dial_instructions">Choose a clock dial</string>
 
