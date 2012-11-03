@@ -16,6 +16,9 @@
 
 package com.android.deskclock;
 
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.media.RingtoneManager;
@@ -28,6 +31,8 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceScreen;
 import android.preference.RingtonePreference;
 import android.provider.Settings;
+
+import net.margaritov.preference.colorpicker.ColorPickerPreference;
 
 /**
  * Settings for the Alarm Clock.
@@ -42,12 +47,19 @@ public class SettingsActivity extends PreferenceActivity
             "alarm_in_silent_mode";
     static final String KEY_ALARM_SNOOZE =
             "snooze_duration";
+	static final String KEY_FLIP_ACTION =
+			"flip_action";
+	static final String KEY_SHAKE_ACTION =
+			"shake_action";
+
     static final String KEY_VOLUME_BEHAVIOR =
             "volume_button_setting";
     static final String KEY_DEFAULT_RINGTONE =
             "default_ringtone";
     static final String KEY_AUTO_SILENCE =
             "auto_silence";
+    static final String KEY_DIGITAL_CLOCK_COLOR =
+            "digital_clock_color";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,6 +116,22 @@ public class SettingsActivity extends PreferenceActivity
             final ListPreference listPref = (ListPreference) pref;
             String delay = (String) newValue;
             updateAutoSnoozeSummary(listPref, delay);
+        } else if (KEY_FLIP_ACTION.equals(pref.getKey())) {
+			final ListPreference listPref = (ListPreference) pref;
+			String action = (String) newValue;
+			updateFlipActionSummary(listPref, action);
+		} else if (KEY_SHAKE_ACTION.equals(pref.getKey())) {
+			final ListPreference listPref = (ListPreference) pref;
+			String action = (String) newValue;
+			updateShakeActionSummary(listPref, action);
+		} else if (KEY_DIGITAL_CLOCK_COLOR.equals(pref.getKey())) {
+            AppWidgetManager widgetManager = AppWidgetManager.getInstance(this);
+            ComponentName widgetComponent = new ComponentName(this, DigitalAppWidgetProvider.class);
+            int[] widgetIds = widgetManager.getAppWidgetIds(widgetComponent);
+            Intent update = new Intent();
+            update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds);
+            update.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+            this.sendBroadcast(update);
         }
         return true;
     }
@@ -118,7 +146,18 @@ public class SettingsActivity extends PreferenceActivity
         }
     }
 
+	private void updateFlipActionSummary(ListPreference listPref, String action) {
+		int i = Integer.parseInt(action);
+		listPref.setSummary(getString(R.string.flip_action_summary,
+				getResources().getStringArray(R.array.flip_action_entries)[i]
+						.toLowerCase()));
+	}
 
+	private void updateShakeActionSummary(ListPreference listPref, String action) {
+		int i = Integer.parseInt(action);
+		listPref.setSummary(getString(R.string.shake_summary, getResources()
+				.getStringArray(R.array.flip_action_entries)[i].toLowerCase()));
+	}
     private void refresh() {
         final CheckBoxPreference alarmInSilentModePref =
                 (CheckBoxPreference) findPreference(KEY_ALARM_IN_SILENT_MODE);
@@ -137,5 +176,19 @@ public class SettingsActivity extends PreferenceActivity
         String delay = listPref.getValue();
         updateAutoSnoozeSummary(listPref, delay);
         listPref.setOnPreferenceChangeListener(this);
+
+		listPref = (ListPreference) findPreference(KEY_FLIP_ACTION);
+		String action = listPref.getValue();
+		updateFlipActionSummary(listPref, action);
+		listPref.setOnPreferenceChangeListener(this);
+
+		listPref = (ListPreference) findPreference(KEY_SHAKE_ACTION);
+		String shake = listPref.getValue();
+		updateShakeActionSummary(listPref, shake);
+		listPref.setOnPreferenceChangeListener(this);
+
+
+        ColorPickerPreference clockColor = (ColorPickerPreference) findPreference(KEY_DIGITAL_CLOCK_COLOR);
+        clockColor.setOnPreferenceChangeListener(this);
     }
 }
