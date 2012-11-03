@@ -28,7 +28,7 @@
     <color name="grey">#ffaaaaaa</color>
     <color name="transparent">#00000000</color>
     <color name="bg_bar">#ff43474c</color>
-    <color name="fg_bar">#ff32b1e0</color>
+    <color name="fg_bar">#ffffa200</color>
 
     <color name="titlebar_separator">#ffff8e00</color>
     <color name="main_timer_clock">#ffff8e00</color>
