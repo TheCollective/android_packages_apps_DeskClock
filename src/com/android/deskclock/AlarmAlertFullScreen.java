@@ -24,20 +24,26 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
+import android.content.SharedPreferences;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.preference.PreferenceManager;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.android.deskclock.widget.multiwaveview.GlowPadView;
 
 import java.util.Calendar;
 
@@ -46,32 +52,46 @@ import java.util.Calendar;
  * tone. This activity is the full screen version which shows over the lock
  * screen with the wallpaper as the background.
  */
-public class AlarmAlertFullScreen extends Activity {
+public class AlarmAlertFullScreen extends Activity implements GlowPadView.OnTriggerListener {
 
+    private final boolean LOG = true;
     // These defaults must match the values in res/xml/settings.xml
     private static final String DEFAULT_SNOOZE = "10";
     private static final String DEFAULT_VOLUME_BEHAVIOR = "2";
-	private static final String DEFAULT_FLIP_ACTION = "0";
-	private static final String DEFAULT_SHAKE_ACTION = "1";
-	private static final boolean DEFAULT_MATH_VALUE = false;
+    private static final String DEFAULT_FLIP_ACTION = "0";
+    private static final String DEFAULT_SHAKE_ACTION = "1";
 
     protected static final String SCREEN_OFF = "screen_off";
 
     protected Alarm mAlarm;
     private int mVolumeBehavior;
     boolean mFullscreenStyle;
-	private int mFlipAction;
-	private int mShakeAction;
-	SensorEventListener mOrientationListener;
-	SensorEventListener mShakeListener;
+    private GlowPadView mGlowPadView;
+    private boolean mIsDocked = false;
 
+    // Parameters for the GlowPadView "ping" animation; see triggerPing().
+    private static final int PING_MESSAGE_WHAT = 101;
+    private static final boolean ENABLE_PING_AUTO_REPEAT = true;
+    private static final long PING_AUTO_REPEAT_DELAY_MSEC = 1200;
+
+    private boolean mPingEnabled = true;
+    private int mFlipAction;
+    private int mShakeAction;
+
+    // constants for no action/snooze/dismiss
+    private static final int ALARM_NO_ACTION = 0;
+    private static final int ALARM_SNOOZE = 1;
+    private static final int ALARM_DISMISS = 2;
 
     // Receives the ALARM_KILLED action from the AlarmKlaxon,
     // and also ALARM_SNOOZE_ACTION / ALARM_DISMISS_ACTION from other applications
-    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+            if (LOG) {
+                Log.v("AlarmAlertFullScreen - onReceive " + action);
+            }
             if (action.equals(Alarms.ALARM_SNOOZE_ACTION)) {
                 snooze();
             } else if (action.equals(Alarms.ALARM_DISMISS_ACTION)) {
@@ -85,11 +105,128 @@ public class AlarmAlertFullScreen extends Activity {
         }
     };
 
+    private final Handler mPingHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case PING_MESSAGE_WHAT:
+                    triggerPing();
+                    break;
+            }
+        }
+    };
+
+    private final SensorEventListener mFlipListener = new SensorEventListener() {
+        private static final int FACE_UP_LOWER_LIMIT = -45;
+        private static final int FACE_UP_UPPER_LIMIT = 45;
+        private static final int FACE_DOWN_UPPER_LIMIT = 135;
+        private static final int FACE_DOWN_LOWER_LIMIT = -135;
+        private static final int TILT_UPPER_LIMIT = 45;
+        private static final int TILT_LOWER_LIMIT = -45;
+        private static final int SENSOR_SAMPLES = 3;
+
+        private boolean mWasFaceUp;
+        private boolean[] mSamples = new boolean[SENSOR_SAMPLES];
+        private int mSampleIndex;
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int acc) {
+        }
+
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            // Add a sample overwriting the oldest one. Several samples
+            // are used
+            // to avoid the erroneous values the sensor sometimes
+            // returns.
+            float y = event.values[1];
+            float z = event.values[2];
+
+            if (!mWasFaceUp) {
+                // Check if its face up enough.
+                mSamples[mSampleIndex] = y > FACE_UP_LOWER_LIMIT
+                        && y < FACE_UP_UPPER_LIMIT
+                        && z > TILT_LOWER_LIMIT && z < TILT_UPPER_LIMIT;
+
+                // The device first needs to be face up.
+                boolean faceUp = true;
+                for (boolean sample : mSamples) {
+                    faceUp = faceUp && sample;
+                }
+                if (faceUp) {
+                    mWasFaceUp = true;
+                    for (int i = 0; i < SENSOR_SAMPLES; i++) {
+                        mSamples[i] = false;
+                    }
+                }
+            } else {
+                // Check if its face down enough. Note that wanted
+                // values go from FACE_DOWN_UPPER_LIMIT to 180
+                // and from -180 to FACE_DOWN_LOWER_LIMIT
+                mSamples[mSampleIndex] = (y > FACE_DOWN_UPPER_LIMIT || y < FACE_DOWN_LOWER_LIMIT)
+                        && z > TILT_LOWER_LIMIT
+                        && z < TILT_UPPER_LIMIT;
+
+                boolean faceDown = true;
+                for (boolean sample : mSamples) {
+                    faceDown = faceDown && sample;
+                }
+                if (faceDown) {
+                    handleAction(mFlipAction);
+                }
+            }
+
+            mSampleIndex = ((mSampleIndex + 1) % SENSOR_SAMPLES);
+        }
+    };
+
+    private final SensorEventListener mShakeListener = new SensorEventListener() {
+        private static final float SENSITIVITY = 16;
+        private static final int BUFFER = 5;
+        private float[] gravity = new float[3];
+        private float average = 0;
+        private int fill = 0;
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int acc) {
+        }
+
+        public void onSensorChanged(SensorEvent event) {
+            final float alpha = 0.8F;
+
+            for (int i = 0; i < 3; i++) {
+                gravity[i] = alpha * gravity[i] + (1 - alpha) * event.values[i];
+            }
+
+            float x = event.values[0] - gravity[0];
+            float y = event.values[1] - gravity[1];
+            float z = event.values[2] - gravity[2];
+
+            if (fill <= BUFFER) {
+                average += Math.abs(x) + Math.abs(y) + Math.abs(z);
+                fill++;
+            } else {
+                if (average / BUFFER >= SENSITIVITY) {
+                    handleAction(mShakeAction);
+                }
+                average = 0;
+                fill = 0;
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
 
         mAlarm = getIntent().getParcelableExtra(Alarms.ALARM_INTENT_EXTRA);
+
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - onCreate");
+            if (mAlarm != null) {
+                Log.v("AlarmAlertFullScreen - Alarm Id " + mAlarm.toString());
+            }
+        }
 
         // Get the volume/camera button behavior setting
         final String vol =
@@ -97,18 +234,6 @@ public class AlarmAlertFullScreen extends Activity {
                 .getString(SettingsActivity.KEY_VOLUME_BEHAVIOR,
                         DEFAULT_VOLUME_BEHAVIOR);
         mVolumeBehavior = Integer.parseInt(vol);
-
-		final String flipAction = PreferenceManager
-				.getDefaultSharedPreferences(this).getString(
-						SettingsActivity.KEY_FLIP_ACTION, DEFAULT_FLIP_ACTION);
-		Log.v("flipaction = " + flipAction);
-		mFlipAction = Integer.parseInt(flipAction);
-
-		final String shakeAction = PreferenceManager
-				.getDefaultSharedPreferences(this)
-				.getString(SettingsActivity.KEY_SHAKE_ACTION,
-						DEFAULT_SHAKE_ACTION);
-                mShakeAction = Integer.parseInt(shakeAction);
 
         final Window win = getWindow();
         win.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
@@ -122,6 +247,14 @@ public class AlarmAlertFullScreen extends Activity {
         }
 
         updateLayout();
+
+        // Check the docking status , if the device is docked , do not limit rotation
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_DOCK_EVENT);
+        Intent dockStatus = registerReceiver(null, ifilter);
+        if (dockStatus != null) {
+            mIsDocked = dockStatus.getIntExtra(Intent.EXTRA_DOCK_STATE, -1)
+                    != Intent.EXTRA_DOCK_STATE_UNDOCKED;
+        }
 
         // Register to get the alarm killed/snooze/dismiss intent.
         IntentFilter filter = new IntentFilter(Alarms.ALARM_KILLED);
@@ -140,43 +273,43 @@ public class AlarmAlertFullScreen extends Activity {
     }
 
     protected int getLayoutResId() {
-        return R.layout.alarm_alert_fullscreen;
+        return R.layout.alarm_alert;
     }
-    
+
     private void updateLayout() {
-        LayoutInflater inflater = LayoutInflater.from(this);
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - updateLayout");
+        }
 
-        setContentView(inflater.inflate(getLayoutResId(), null));
-
-        /* snooze behavior: pop a snooze confirmation view, kick alarm
-           manager. */
-        Button snooze = (Button) findViewById(R.id.snooze);
-        snooze.requestFocus();
-        snooze.setOnClickListener(new Button.OnClickListener() {
-            public void onClick(View v) {
-                snooze();
-            }
-        });
-
-        /* dismiss button: close notification */
-        findViewById(R.id.dismiss).setOnClickListener(
-                new Button.OnClickListener() {
-                    public void onClick(View v) {
-                        dismiss(false);
-                    }
-                });
+        final LayoutInflater inflater = LayoutInflater.from(this);
+        final View view = inflater.inflate(getLayoutResId(), null);
+        view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+        setContentView(view);
 
         /* Set the title from the passed in alarm */
         setTitle();
+
+        mGlowPadView = (GlowPadView) findViewById(R.id.glow_pad_view);
+        mGlowPadView.setOnTriggerListener(this);
+        triggerPing();
+    }
+
+    private void triggerPing() {
+        if (mPingEnabled) {
+            mGlowPadView.ping();
+
+            if (ENABLE_PING_AUTO_REPEAT) {
+                mPingHandler.sendEmptyMessageDelayed(PING_MESSAGE_WHAT, PING_AUTO_REPEAT_DELAY_MSEC);
+            }
+        }
     }
 
     // Attempt to snooze this alert.
     private void snooze() {
-        // Do not snooze if the snooze button is disabled.
-        if (!findViewById(R.id.snooze).isEnabled()) {
-            dismiss(false);
-            return;
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - snooze");
         }
+
         final String snooze =
                 PreferenceManager.getDefaultSharedPreferences(this)
                 .getString(SettingsActivity.KEY_ALARM_SNOOZE, DEFAULT_SNOOZE);
@@ -190,26 +323,34 @@ public class AlarmAlertFullScreen extends Activity {
         // Get the display time for the snooze and update the notification.
         final Calendar c = Calendar.getInstance();
         c.setTimeInMillis(snoozeTime);
-
-        // Append (snoozed) to the label.
+        String snoozeTimeStr = Alarms.formatTime(this, c);
         String label = mAlarm.getLabelOrDefault(this);
-        label = getString(R.string.alarm_notify_snooze_label, label);
 
         // Notify the user that the alarm has been snoozed.
-        Intent cancelSnooze = new Intent(this, AlarmReceiver.class);
-        cancelSnooze.setAction(Alarms.CANCEL_SNOOZE);
-        cancelSnooze.putExtra(Alarms.ALARM_INTENT_EXTRA, mAlarm);
-        PendingIntent broadcast =
-                PendingIntent.getBroadcast(this, mAlarm.id, cancelSnooze, 0);
+        Intent dismissIntent = new Intent(this, AlarmReceiver.class);
+        dismissIntent.setAction(Alarms.CANCEL_SNOOZE);
+        dismissIntent.putExtra(Alarms.ALARM_INTENT_EXTRA, mAlarm);
+
+        Intent openAlarm = new Intent(this, DeskClock.class);
+        openAlarm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        openAlarm.putExtra(Alarms.ALARM_INTENT_EXTRA, mAlarm);
+        openAlarm.putExtra(DeskClock.SELECT_TAB_INTENT_EXTRA, DeskClock.CLOCK_TAB_INDEX);
+
         NotificationManager nm = getNotificationManager();
-        Notification n = new Notification(R.drawable.stat_notify_alarm,
-                label, 0);
-        n.setLatestEventInfo(this, label,
-                getString(R.string.alarm_notify_snooze_text,
-                    Alarms.formatTime(this, c)), broadcast);
-        n.flags |= Notification.FLAG_AUTO_CANCEL
-                | Notification.FLAG_ONGOING_EVENT;
-        nm.notify(mAlarm.id, n);
+        Notification notif = new Notification.Builder(getApplicationContext())
+        .setContentTitle(label)
+        .setContentText(getResources().getString(R.string.alarm_alert_snooze_until, snoozeTimeStr))
+        .setSmallIcon(R.drawable.stat_notify_alarm)
+        .setOngoing(true)
+        .setAutoCancel(false)
+        .setPriority(Notification.PRIORITY_MAX)
+        .setWhen(0)
+        .addAction(android.R.drawable.ic_menu_close_clear_cancel,
+                getResources().getString(R.string.alarm_alert_dismiss_text),
+                PendingIntent.getBroadcast(this, mAlarm.id, dismissIntent, 0))
+        .build();
+        notif.contentIntent = PendingIntent.getActivity(this, mAlarm.id, openAlarm, 0);
+        nm.notify(mAlarm.id, notif);
 
         String displayTime = getString(R.string.alarm_alert_snooze_set,
                 snoozeMinutes);
@@ -227,177 +368,62 @@ public class AlarmAlertFullScreen extends Activity {
         return (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
     }
 
-	private SensorManager getSensorManager() {
-		return (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-	}
+    private SensorManager getSensorManager() {
+        return (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+    }
 
-	// Dismiss the alarm.
-	private void dismiss(boolean killed) {
-		Log.i(killed ? "Alarm killed" : "Alarm dismissed by user");
-		// The service told us that the alarm has been killed, do not modify
-		// the notification or stop the service.
-			if (!killed) {
-				// Cancel the notification and stop playing the alarm
-				NotificationManager nm = getNotificationManager();
-				nm.cancel(mAlarm.id);
-				stopService(new Intent(Alarms.ALARM_ALERT_ACTION));
-			}
-		finish();
-	}
+    // Dismiss the alarm.
+    private void dismiss(boolean killed) {
+        Log.i(killed ? "Alarm killed" : "Alarm dismissed by user");
+        // The service told us that the alarm has been killed, do not modify
+        // the notification or stop the service.
+        if (!killed) {
+            // Cancel the notification and stop playing the alarm
+            NotificationManager nm = getNotificationManager();
+            nm.cancel(mAlarm.id);
+            stopService(new Intent(Alarms.ALARM_ALERT_ACTION));
+        }
+        finish();
+    }
 
-	private void attachOrientationListener() {
-		if (mFlipAction != 0) {
-			mOrientationListener = new SensorEventListener() {
-				private static final int FACE_UP_LOWER_LIMIT = -45;
-				private static final int FACE_UP_UPPER_LIMIT = 45;
-				private static final int FACE_DOWN_UPPER_LIMIT = 135;
-				private static final int FACE_DOWN_LOWER_LIMIT = -135;
-				private static final int TILT_UPPER_LIMIT = 45;
-				private static final int TILT_LOWER_LIMIT = -45;
-				private static final int SENSOR_SAMPLES = 3;
+    private void attachListeners() {
+        final SensorManager sm = getSensorManager();
 
-				private boolean mWasFaceUp;
-				private boolean[] mSamples = new boolean[SENSOR_SAMPLES];
-				private int mSampleIndex;
+        if (mFlipAction != ALARM_NO_ACTION) {
+            sm.registerListener(mFlipListener,
+                    sm.getDefaultSensor(Sensor.TYPE_ORIENTATION),
+                    SensorManager.SENSOR_DELAY_NORMAL);
+        }
 
-				@Override
-				public void onAccuracyChanged(Sensor sensor, int acc) {
-				}
+        if (mShakeAction != ALARM_NO_ACTION) {
+            sm.registerListener(mShakeListener,
+                    sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                    SensorManager.SENSOR_DELAY_GAME);
+        }
+    }
 
-				@Override
-				public void onSensorChanged(SensorEvent event) {
-					// Add a sample overwriting the oldest one. Several samples
-					// are used
-					// to avoid the erroneous values the sensor sometimes
-					// returns.
-					float y = event.values[1];
-					float z = event.values[2];
+    private void detachListeners() {
+        if (mFlipAction != ALARM_NO_ACTION) {
+            getSensorManager().unregisterListener(mFlipListener);
+        }
+        if (mShakeAction != ALARM_NO_ACTION) {
+            getSensorManager().unregisterListener(mShakeListener);
+        }
+    }
 
-					if (!mWasFaceUp) {
-						// Check if its face up enough.
-						mSamples[mSampleIndex] = y > FACE_UP_LOWER_LIMIT
-								&& y < FACE_UP_UPPER_LIMIT
-								&& z > TILT_LOWER_LIMIT && z < TILT_UPPER_LIMIT;
-
-						// The device first needs to be face up.
-						boolean faceUp = true;
-						for (boolean sample : mSamples) {
-							faceUp = faceUp && sample;
-						}
-						if (faceUp) {
-							mWasFaceUp = true;
-							for (int i = 0; i < SENSOR_SAMPLES; i++)
-								mSamples[i] = false;
-						}
-					} else {
-						// Check if its face down enough. Note that wanted
-						// values go from FACE_DOWN_UPPER_LIMIT to 180
-						// and from -180 to FACE_DOWN_LOWER_LIMIT
-						mSamples[mSampleIndex] = (y > FACE_DOWN_UPPER_LIMIT || y < FACE_DOWN_LOWER_LIMIT)
-								&& z > TILT_LOWER_LIMIT && z < TILT_UPPER_LIMIT;
-
-						boolean faceDown = true;
-						for (boolean sample : mSamples) {
-							faceDown = faceDown && sample;
-						}
-						if (faceDown) {
-							switch (mFlipAction) {
-							case 1:
-								snooze();
-								break;
-
-							case 2:
-								dismiss(false);
-								break;
-
-							default:
-								break;
-							}
-						}
-					}
-
-					mSampleIndex = ((mSampleIndex + 1) % SENSOR_SAMPLES);
-				}
-			};
-
-			// Register the sensor listener and start to get values
-			getSensorManager().registerListener(
-					mOrientationListener,
-					getSensorManager()
-							.getDefaultSensor(Sensor.TYPE_ORIENTATION),
-					SensorManager.SENSOR_DELAY_NORMAL);
-		}
-	}
-
-	private void attachShakeListener() {
-		if (mShakeAction != 0) {
-			mShakeListener = new SensorEventListener() {
-				private static final float SENSITIVITY = 16;
-				private static final int BUFFER = 5;
-				private float[] gravity = new float[3];
-				private float average = 0;
-				private int i = 0;
-
-				@Override
-				public void onAccuracyChanged(Sensor sensor, int acc) {
-				}
-
-				public void onSensorChanged(SensorEvent event) {
-
-					final float alpha = (float) 0.8;
-
-					float x = event.values[0]
-							- (gravity[0] = alpha * gravity[0] + (1 - alpha)
-									* event.values[0]);
-					float y = event.values[1]
-							- (gravity[1] = alpha * gravity[1] + (1 - alpha)
-									* event.values[1]);
-					float z = event.values[2]
-							- (gravity[2] = alpha * gravity[2] + (1 - alpha)
-									* event.values[2]);
-					if (i <= BUFFER) {
-						average += Math.abs(x) + Math.abs(y) + Math.abs(z);
-						i += 1;
-					} else {
-						if (average / BUFFER >= SENSITIVITY)
-							switch (mShakeAction) {
-							case 1:
-								snooze();
-								break;
-
-							case 2:
-								dismiss(false);
-								break;
-
-							default:
-								break;
-							}
-						;
-						average = 0;
-						i = 0;
-					}
-				}
-			};
-			getSensorManager().registerListener(
-					mShakeListener,
-					getSensorManager().getDefaultSensor(
-							Sensor.TYPE_ACCELEROMETER),
-					SensorManager.SENSOR_DELAY_GAME);
-		}
-	}
-
-	private void detachListeners() {
-		if (mOrientationListener != null) {
-			getSensorManager().unregisterListener(mOrientationListener);
-			mOrientationListener = null;
-		}
-		if (mShakeListener != null) {
-			getSensorManager().unregisterListener(mShakeListener);
-			mShakeListener = null;
-		}
-	}
-
-
+    private void handleAction(int action) {
+        switch (action) {
+            case ALARM_SNOOZE:
+                snooze();
+                break;
+            case ALARM_DISMISS:
+                dismiss(false);
+                break;
+            case ALARM_NO_ACTION:
+            default:
+                break;
+        }
+    }
 
     /**
      * this is called when a second alarm is triggered while a
@@ -407,7 +433,7 @@ public class AlarmAlertFullScreen extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
 
-        if (Log.LOGV) Log.v("AlarmAlert.OnNewIntent()");
+        if (LOG) Log.v("AlarmAlert.OnNewIntent()");
 
         mAlarm = intent.getParcelableExtra(Alarms.ALARM_INTENT_EXTRA);
 
@@ -415,37 +441,67 @@ public class AlarmAlertFullScreen extends Activity {
     }
 
     @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - onConfigChanged");
+        }
+        updateLayout();
+        super.onConfigurationChanged(newConfig);
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
-        // If the alarm was deleted at some point, disable snooze.
-        if (Alarms.getAlarm(getContentResolver(), mAlarm.id) == null) {
-            Button snooze = (Button) findViewById(R.id.snooze);
-            snooze.setEnabled(false);
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - onResume");
         }
 
-		attachOrientationListener();
-		attachShakeListener();
+        final SharedPreferences prefs = PreferenceManager.
+                getDefaultSharedPreferences(this);
+        mFlipAction = Integer.parseInt(prefs.getString(
+                SettingsActivity.KEY_FLIP_ACTION, DEFAULT_FLIP_ACTION));
+        mShakeAction = Integer.parseInt(prefs.getString(
+                SettingsActivity.KEY_SHAKE_ACTION, DEFAULT_SHAKE_ACTION));
+
+        // If the alarm was deleted at some point, disable snooze.
+        if (Alarms.getAlarm(getContentResolver(), mAlarm.id) == null) {
+            mGlowPadView.setTargetResources(R.array.dismiss_drawables);
+            mGlowPadView.setTargetDescriptionsResourceId(R.array.dismiss_descriptions);
+            mGlowPadView.setDirectionDescriptionsResourceId(R.array.dismiss_direction_descriptions);
+        }
+        // The activity is locked to the default orientation as a default set in the manifest
+        // Override this settings if the device is docked or config set it differently
+        if (getResources().getBoolean(R.bool.config_rotateAlarmAlert) || mIsDocked) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }
+
+        attachListeners();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (Log.LOGV) Log.v("AlarmAlert.onDestroy()");
+        if (LOG) Log.v("AlarmAlertFullScreen.onDestroy()");
         // No longer care about the alarm being killed.
         unregisterReceiver(mReceiver);
     }
 
-	@Override
-	public void onPause() {
-		super.onPause();
-		detachListeners();
-	}
+    @Override
+    public void onPause() {
+        super.onPause();
+        detachListeners();
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         // Do this on key down to handle a few of the system keys.
         boolean up = event.getAction() == KeyEvent.ACTION_UP;
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - dispatchKeyEvent " + event.getKeyCode());
+        }
         switch (event.getKeyCode()) {
             // Volume keys and camera keys dismiss the alarm
+            case KeyEvent.KEYCODE_POWER:
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_MUTE:
@@ -476,6 +532,46 @@ public class AlarmAlertFullScreen extends Activity {
     public void onBackPressed() {
         // Don't allow back to dismiss. This method is overriden by AlarmAlert
         // so that the dialog is dismissed.
+        if (LOG) {
+            Log.v("AlarmAlertFullScreen - onBackPressed");
+        }
         return;
+    }
+
+
+    @Override
+    public void onGrabbed(View v, int handle) {
+        mPingEnabled = false;
+    }
+
+    @Override
+    public void onReleased(View v, int handle) {
+        mPingEnabled = true;
+        triggerPing();
+    }
+
+    @Override
+    public void onTrigger(View v, int target) {
+        final int resId = mGlowPadView.getResourceIdForTarget(target);
+        switch (resId) {
+            case R.drawable.ic_alarm_alert_snooze:
+                snooze();
+                break;
+
+            case R.drawable.ic_alarm_alert_dismiss:
+                dismiss(false);
+                break;
+            default:
+                // Code should never reach here.
+                Log.e("Trigger detected on unhandled resource. Skipping.");
+        }
+    }
+
+    @Override
+    public void onGrabbedStateChange(View v, int handle) {
+    }
+
+    @Override
+    public void onFinishFinalAnimation() {
     }
 }

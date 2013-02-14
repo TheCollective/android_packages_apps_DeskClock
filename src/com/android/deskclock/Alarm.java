@@ -26,6 +26,8 @@ import android.provider.BaseColumns;
 
 import java.text.DateFormatSymbols;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.HashSet;
 
 public final class Alarm implements Parcelable {
 
@@ -58,7 +60,7 @@ public final class Alarm implements Parcelable {
         p.writeString(label);
         p.writeParcelable(alert, flags);
         p.writeInt(silent ? 1 : 0);
-		p.writeInt(incvol ? 1 : 0);
+        p.writeInt(incvol ? 1 : 0);
     }
     //////////////////////////////
     // end Parcelable apis
@@ -122,18 +124,18 @@ public final class Alarm implements Parcelable {
          * <P>Type: STRING</P>
          */
         public static final String ALERT = "alert";
-		
-		/**
-		* True if alarm should start off quiet and slowly increase volume
-		* <P>Type: BOOLEAN</P>
-		*/
-		public static final String INCVOL = "incvol";
+
+        /**
+         * True if alarm should start off quiet and slowly increase volume
+         * <P>Type: BOOLEAN</P>
+         */
+        public static final String INCVOL = "incvol";
 
         /**
          * The default sort order for this table
          */
         public static final String DEFAULT_SORT_ORDER =
-                HOUR + ", " + MINUTES + " ASC";
+                HOUR + ", " + MINUTES + " ASC" + ", " + _ID + " DESC";
 
         // Used when filtering enabled alarms.
         public static final String WHERE_ENABLED = ENABLED + "=1";
@@ -155,7 +157,7 @@ public final class Alarm implements Parcelable {
         public static final int ALARM_VIBRATE_INDEX = 6;
         public static final int ALARM_MESSAGE_INDEX = 7;
         public static final int ALARM_ALERT_INDEX = 8;
-		public static final int ALARM_INCVOL_INDEX = 9;
+        public static final int ALARM_INCVOL_INDEX = 9;
     }
     //////////////////////////////
     // End column definitions
@@ -172,7 +174,24 @@ public final class Alarm implements Parcelable {
     public String     label;
     public Uri        alert;
     public boolean    silent;
-	public boolean    incvol;
+    public boolean    incvol;
+
+    @Override
+    public String toString() {
+        return "Alarm{" +
+                "alert=" + alert +
+                ", id=" + id +
+                ", enabled=" + enabled +
+                ", hour=" + hour +
+                ", minutes=" + minutes +
+                ", daysOfWeek=" + daysOfWeek +
+                ", time=" + time +
+                ", vibrate=" + vibrate +
+                ", incvol=" + incvol +
+                ", label='" + label + '\'' +
+                ", silent=" + silent +
+                '}';
+    }
 
     public Alarm(Cursor c) {
         id = c.getInt(Columns.ALARM_ID_INDEX);
@@ -201,7 +220,7 @@ public final class Alarm implements Parcelable {
                         RingtoneManager.TYPE_ALARM);
             }
         }
-		incvol = c.getInt(Columns.ALARM_INCVOL_INDEX) == 1;
+        incvol = c.getInt(Columns.ALARM_INCVOL_INDEX) == 1;
     }
 
     public Alarm(Parcel p) {
@@ -215,20 +234,19 @@ public final class Alarm implements Parcelable {
         label = p.readString();
         alert = (Uri) p.readParcelable(null);
         silent = p.readInt() == 1;
-		incvol = p.readInt() == 1;
+        incvol = p.readInt() == 1;
     }
 
     // Creates a default alarm at the current time.
     public Alarm() {
         id = -1;
-        Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(System.currentTimeMillis());
-        hour = c.get(Calendar.HOUR_OF_DAY);
-        minutes = c.get(Calendar.MINUTE);
+        hour = 0;
+        minutes = 0;
         vibrate = true;
         daysOfWeek = new DaysOfWeek(0);
+        label = "";
         alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-		incvol = false;
+        incvol = false;
     }
 
     public String getLabelOrDefault(Context context) {
@@ -274,6 +292,14 @@ public final class Alarm implements Parcelable {
             Calendar.SUNDAY,
         };
 
+
+        private static HashMap<Integer, Integer> DAY_TO_BIT_MASK = new HashMap<Integer, Integer>();
+        static {
+            for (int i = 0; i < DAY_MAP.length; i++) {
+                DAY_TO_BIT_MASK.put(DAY_MAP[i], i);
+            }
+        }
+
         // Bitmask of all repeating days
         private int mDays;
 
@@ -282,6 +308,14 @@ public final class Alarm implements Parcelable {
         }
 
         public String toString(Context context, boolean showNever) {
+            return toString(context, showNever, false);
+        }
+
+        public String toAccessibilityString(Context context) {
+            return toString(context, false, true);
+        }
+
+        private String toString(Context context, boolean showNever, boolean forAccessibility) {
             StringBuilder ret = new StringBuilder();
 
             // no days
@@ -304,9 +338,9 @@ public final class Alarm implements Parcelable {
 
             // short or long form?
             DateFormatSymbols dfs = new DateFormatSymbols();
-            String[] dayList = (dayCount > 1) ?
-                    dfs.getShortWeekdays() :
-                    dfs.getWeekdays();
+            String[] dayList = (forAccessibility || dayCount <= 1) ?
+                            dfs.getWeekdays() :
+                            dfs.getShortWeekdays();
 
             // selected days
             for (int i = 0; i < 7; i++) {
@@ -324,6 +358,17 @@ public final class Alarm implements Parcelable {
             return ((mDays & (1 << day)) > 0);
         }
 
+        /**
+         * Sets the repeat day for the alarm.
+         *
+         * @param dayOfWeek One of: Calendar.SUNDAY, Calendar.MONDAY, Calendar.TUESDAY, etc.
+         * @param set Whether to set or unset.
+         */
+        public void setDayOfWeek(int dayOfWeek, boolean set) {
+            final int bitIndex = DAY_TO_BIT_MASK.get(dayOfWeek);
+            set(bitIndex, set);
+        }
+
         public void set(int day, boolean set) {
             if (set) {
                 mDays |= (1 << day);
@@ -338,6 +383,16 @@ public final class Alarm implements Parcelable {
 
         public int getCoded() {
             return mDays;
+        }
+
+        public HashSet<Integer> getSetDays() {
+            final HashSet<Integer> set = new HashSet<Integer>();
+            for (int i = 0; i < 7; i++) {
+                if (isSet(i)) {
+                    set.add(DAY_MAP[i]);
+                }
+            }
+            return set;
         }
 
         // Returns days of week encoded in an array of booleans.
@@ -373,6 +428,13 @@ public final class Alarm implements Parcelable {
                 }
             }
             return dayCount;
+        }
+
+        @Override
+        public String toString() {
+            return "DaysOfWeek{" +
+                    "mDays=" + mDays +
+                    '}';
         }
     }
 }

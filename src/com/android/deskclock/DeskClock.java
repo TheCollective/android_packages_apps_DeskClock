@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (C) 2012 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,440 +16,435 @@
 
 package com.android.deskclock;
 
-import android.app.UiModeManager;
-import android.content.BroadcastReceiver;
+import android.app.ActionBar;
+import android.app.ActionBar.Tab;
+import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentTransaction;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.graphics.drawable.TransitionDrawable;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.ContextMenu;
-import android.view.ContextMenu.ContextMenuInfo;
-import android.view.KeyEvent;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
+import android.os.Handler;
+import android.os.Message;
+import android.preference.PreferenceManager;
+import android.support.v13.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.OnTouchListener;
+import android.view.WindowManager.LayoutParams;
+import android.view.animation.Animation;
+import android.view.animation.Animation.AnimationListener;
+import android.view.animation.AnimationUtils;
+import android.view.animation.TranslateAnimation;
+import android.widget.PopupMenu;
+import android.widget.TextView;
 
-import com.android.deskclock.DeskClockPagerAdapter.DeskClockFragments;
-import com.android.deskclock.TimerClockService.TIMER_TYPE;
+import com.android.deskclock.stopwatch.StopwatchFragment;
+import com.android.deskclock.stopwatch.StopwatchService;
+import com.android.deskclock.stopwatch.Stopwatches;
+import com.android.deskclock.timer.TimerFragment;
+import com.android.deskclock.timer.TimerObj;
+import com.android.deskclock.timer.Timers;
+import com.android.deskclock.worldclock.CitiesActivity;
+
+import java.util.ArrayList;
+import java.util.TimeZone;
 
 /**
- * DeskClock clock view for desk docks (contains the DeskClock, StopWatch, and CountDown
- * fragments).
+ * DeskClock clock view for desk docks.
  */
-public class DeskClock extends FragmentActivity {
-
-    /**
-     * @hide
-     */
-    public interface Fragmentable {
-        public View getRootView();
-    }
-
-    /**
-     * @hide
-     */
-    public interface OnBroadcastReceiver {
-        public boolean isBroadcastReceiverReady();
-        public void onBroadcastReceiver(Context context, Intent intent);
-    }
-
-    /**
-     * @hide
-     */
-    public interface FocusableFragment {
-        public void onLostFocus();
-        public void onGainFocus();
-    }
-
-    /**
-     * @hide
-     */
-    public interface ReportableFragment {
-        public void onNotifyNewIntent(Intent intent);
-        public void onNotifyUserInteraction();
-        public boolean onNotifyPrepareOptionsMenu(Menu menu);
-        public boolean onNotifyOptionsItemSelected(MenuItem item);
-        public boolean onNotifyBackPressed();
-    }
-
+public class DeskClock extends Activity implements LabelDialogFragment.TimerLabelDialogHandler {
     private static final boolean DEBUG = false;
 
-    private static final String LOG_TAG = "DeskClock"; //$NON-NLS-1$
+    private static final String LOG_TAG = "DeskClock";
+
+    // Alarm action for midnight (so we can update the date display).
+    private static final String KEY_SELECTED_TAB = "selected_tab";
+    private static final String KEY_CLOCK_STATE = "clock_state";
+
+    public static final String SELECT_TAB_INTENT_EXTRA = "deskclock.select.tab";
+
+    private ActionBar mActionBar;
+    private Tab mTimerTab;
+    private Tab mClockTab;
+    private Tab mStopwatchTab;
 
     private ViewPager mViewPager;
-    private ViewPagerIndicator mViewPagerIndicator;
+    private TabsAdapter mTabsAdapter;
 
-    private boolean mLaunchedFromDock = false;
-    private boolean mLockTransparency = false;
+    public static final int TIMER_TAB_INDEX = 0;
+    public static final int CLOCK_TAB_INDEX = 1;
+    public static final int STOPWATCH_TAB_INDEX = 2;
 
-    private final BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-            if (DEBUG) Log.d(LOG_TAG, "mIntentReceiver.onReceive: action="  //$NON-NLS-1$
-                                                + action + ", intent=" + intent); //$NON-NLS-1$
+    private int mSelectedTab;
 
-            // Broadcast the intent to all fragments
-            DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-            int count = adapter.getCount();
-            for (int i = 0; i < count; i++) {
-                OnBroadcastReceiver receiver = (OnBroadcastReceiver)adapter.getFragment(i);
-                if (receiver.isBroadcastReceiverReady()) {
-                    receiver.onBroadcastReceiver(context, intent);
-                }
-            }
-
-            // Exiting intents are treated by the main activity
-            if (UiModeManager.ACTION_EXIT_DESK_MODE.equals(action)) {
-                if (mLaunchedFromDock) {
-                    // moveTaskToBack(false);
-                    finish();
-                }
-                mLaunchedFromDock = false;
-            } else if (Intent.ACTION_DOCK_EVENT.equals(action)) {
-                if (DEBUG) Log.d(LOG_TAG, "dock event extra " //$NON-NLS-1$
-                        + intent.getExtras().getInt(Intent.EXTRA_DOCK_STATE));
-                if (mLaunchedFromDock && intent.getExtras().getInt(Intent.EXTRA_DOCK_STATE,
-                        Intent.EXTRA_DOCK_STATE_UNDOCKED) == Intent.EXTRA_DOCK_STATE_UNDOCKED) {
-                    finish();
-                    mLaunchedFromDock = false;
-                }
-            }
-        }
-    };
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onStart() {
-        if (DEBUG) Log.d(LOG_TAG, "onStart"); //$NON-NLS-1$
-        super.onStart();
-
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_DATE_CHANGED);
-        filter.addAction(Intent.ACTION_BATTERY_CHANGED);
-        filter.addAction(Intent.ACTION_DOCK_EVENT);
-        filter.addAction(UiModeManager.ACTION_EXIT_DESK_MODE);
-        filter.addAction(DeskClockFragment.ACTION_MIDNIGHT);
-        registerReceiver(mIntentReceiver, filter);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onStop() {
-        if (DEBUG) Log.d(LOG_TAG, "onStop"); //$NON-NLS-1$
-        super.onStop();
-
-        unregisterReceiver(mIntentReceiver);
-    }
-
-    @Override
-    protected void onPause() {
-        if (DEBUG) Log.d(LOG_TAG, "onPause"); //$NON-NLS-1$
-        super.onPause();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onResume() {
-        if (DEBUG) Log.d(LOG_TAG, "onResume"); //$NON-NLS-1$
-        super.onResume();
-
-        final boolean launchedFromDock = getIntent().hasCategory(Intent.CATEGORY_DESK_DOCK);
-        mLaunchedFromDock = launchedFromDock;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        if (DEBUG) Log.d(LOG_TAG,
-                "onCreate with savedInstanceState: " + savedInstanceState); //$NON-NLS-1$
-        super.onCreate(savedInstanceState);
-
-        // Set the layout with the ViewPager
-        setContentView(R.layout.desk_clock_pager);
-
-        // Create the pages of the ViewPager
-        DeskClockPagerAdapter adapter = new DeskClockPagerAdapter(this);
-        DeskClockFragments[] fragments = DeskClockPagerAdapter.DeskClockFragments.values();
-        for (int i=0; i<fragments.length; i++) {
-            adapter.add(fragments[i].getFragmentClass(), new Bundle());
-        }
-
-        // Retrieve the ViewPager
-        this.mViewPager = (ViewPager) findViewById(R.id.desk_clock_pager);
-        this.mViewPager.setOffscreenPageLimit(adapter.getCount()-1);
-        this.mViewPager.setAdapter(adapter);
-
-        // View pager Indicator
-        this.mViewPagerIndicator = (ViewPagerIndicator) findViewById(R.id.viewpager_indicator);
-        this.mViewPagerIndicator.setNumberOfPages(adapter.getCount());
-
-        // Check if is a timer request
-        setDefaultPage();
-
-        // Set the listener
-        this.mViewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-            @Override
-            public void onPageSelected(int position) {
-                // Let to know the fragments where are or not the current page
-                DeskClockPagerAdapter adapter =
-                        (DeskClockPagerAdapter)DeskClock.this.mViewPager.getAdapter();
-                int curPage = adapter.getCurrentPage();
-                FocusableFragment oldPage = (FocusableFragment)adapter.getFragment(curPage);
-                FocusableFragment newPage = (FocusableFragment)adapter.getFragment(position);
-                oldPage.onLostFocus();
-                newPage.onGainFocus();
-                adapter.setCurrentPage(position);
-
-                // Recreate the menu for the new page
-                DeskClock.this.invalidateOptionsMenu();
-            }
-
-            @Override
-            public void onPageScrolled(
-                    int position, float positionOffset,
-                    int positionOffsetPixels) {
-
-                // Fill/Empty transparency swiping transition
-                if (position == DeskClockFragments.DESKCLOCK.ordinal() &&
-                    !DeskClock.this.mLockTransparency) {
-                    int transparency = (int)((Math.abs(0 - positionOffset)) * 255);
-                    setFragmentTransparency(transparency);
-                } else {
-                    setFragmentTransparency(255);
-                }
-
-                // Move the view pager indicator
-                DeskClock.this.mViewPagerIndicator.onPageScrollChange(position, positionOffset);
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-                DeskClock.this.mLockTransparency = false;
-            }
-        });
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (DEBUG) Log.d(LOG_TAG, "onDestroy"); //$NON-NLS-1$
-        super.onDestroy();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        if (DEBUG) Log.d(LOG_TAG, "onSaveInstanceState"); //$NON-NLS-1$
-        super.onSaveInstanceState(outState);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState) {
-        if (DEBUG) Log.d(LOG_TAG, "onRestoreInstanceState"); //$NON-NLS-1$
-        super.onRestoreInstanceState(savedInstanceState);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onUserInteraction() {
-        DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-        ReportableFragment fragment =
-                (ReportableFragment)(adapter.getFragment(mViewPager.getCurrentItem()));
-        fragment.onNotifyUserInteraction();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void onNewIntent(Intent newIntent) {
         super.onNewIntent(newIntent);
-        if (DEBUG) Log.d(LOG_TAG, "onNewIntent with intent: " + newIntent); //$NON-NLS-1$
+        if (DEBUG) Log.d(LOG_TAG, "onNewIntent with intent: " + newIntent);
 
         // update our intent so that we can consult it to determine whether or
         // not the most recent launch was via a dock event
         setIntent(newIntent);
 
-        // Check if is a timer request
-        setDefaultPage();
-
-        // Notify the new intent to all fragments
-        DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-        int count = adapter.getCount();
-        for (int i = 0; i < count; i++) {
-            ReportableFragment fragment = (ReportableFragment)adapter.getFragment(i);
-            fragment.onNotifyNewIntent(newIntent);
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.desk_clock_menu, menu);
-        return true;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-        super.onCreateContextMenu(menu, v, menuInfo);
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.desk_clock_menu, menu);
-        onPrepareOptionsMenu(menu);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean onContextItemSelected(MenuItem item) {
-        return onOptionsItemSelected(item);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-        int pos = this.mViewPager.getCurrentItem();
-
-        // Only show the menu group of the current
-        menu.setGroupVisible(
-                R.id.menu_group_deskclock, pos == DeskClockFragments.DESKCLOCK.ordinal());
-        menu.setGroupVisible(
-                R.id.menu_group_stopwatch, pos == DeskClockFragments.STOPWATCH.ordinal());
-        menu.setGroupVisible(
-                R.id.menu_group_countdown, pos == DeskClockFragments.COUNTDOWN.ordinal());
-
-        DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-        ReportableFragment fragment =
-                (ReportableFragment)(adapter.getFragment(mViewPager.getCurrentItem()));
-        fragment.onNotifyPrepareOptionsMenu(menu);
-        return super.onPrepareOptionsMenu(menu);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-        ReportableFragment fragment =
-                (ReportableFragment)(adapter.getFragment(mViewPager.getCurrentItem()));
-        return fragment.onNotifyOptionsItemSelected(item);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-            ReportableFragment fragment =
-                    (ReportableFragment)(adapter.getFragment(mViewPager.getCurrentItem()));
-            if (!fragment.onNotifyBackPressed()) {
-                finish();
+        // Timer receiver may ask to go to the timers fragment if a timer expired.
+        int tab = newIntent.getIntExtra(SELECT_TAB_INTENT_EXTRA, -1);
+        if (tab != -1) {
+            if (mActionBar != null) {
+                mActionBar.setSelectedNavigationItem(tab);
             }
         }
-        return false;
     }
 
-    /**
-     * Method that checks the type of timer that produce the application calling
-     */
-    private void setDefaultPage() {
-        // Log the transparency transition
-        this.mLockTransparency = true;
-        setFragmentTransparency(255);
+    private void initViews() {
 
-        // Check what timer is calling the application
-        TIMER_TYPE timerType =
-                (TIMER_TYPE)getIntent().
-                    getSerializableExtra(TimerClockService.EXTRA_TIMER_TYPE);
-        if (timerType != null
-                && TimerClockService.TIMER_TYPE.COUNTDOWN.compareTo(timerType) == 0) {
-            // PowerOn the screen
-            setWakeLock(true);
+        if (mTabsAdapter == null) {
+            mViewPager = new ViewPager(this);
+            mViewPager.setId(R.id.desk_clock_pager);
+            mTabsAdapter = new TabsAdapter(this, mViewPager);
+            createTabs(mSelectedTab);
+        }
+        setContentView(mViewPager);
+        mActionBar.setSelectedNavigationItem(mSelectedTab);
+    }
 
-            // Change to CountDown timer
-            DeskClock.this.mViewPager.
-                setCurrentItem(DeskClockFragments.COUNTDOWN.ordinal(), true);
-        } else {
-            this.mViewPager.setCurrentItem(DeskClockFragments.DESKCLOCK.ordinal());
+    private void createTabs(int selectedIndex) {
+        mActionBar = getActionBar();
+
+        mActionBar.setDisplayOptions(0);
+        if (mActionBar != null) {
+            mActionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
+            mTimerTab = mActionBar.newTab();
+            mTimerTab.setIcon(R.drawable.timer_tab);
+            mTimerTab.setContentDescription(R.string.menu_timer);
+            mTabsAdapter.addTab(mTimerTab, TimerFragment.class,TIMER_TAB_INDEX);
+
+            mClockTab = mActionBar.newTab();
+            mClockTab.setIcon(R.drawable.clock_tab);
+            mClockTab.setContentDescription(R.string.menu_clock);
+            mTabsAdapter.addTab(mClockTab, ClockFragment.class,CLOCK_TAB_INDEX);
+            mStopwatchTab = mActionBar.newTab();
+            mStopwatchTab.setIcon(R.drawable.stopwatch_tab);
+            mStopwatchTab.setContentDescription(R.string.menu_stopwatch);
+            mTabsAdapter.addTab(mStopwatchTab, StopwatchFragment.class,STOPWATCH_TAB_INDEX);
+            mActionBar.setSelectedNavigationItem(selectedIndex);
+        }
+    }
+
+    @Override
+    protected void onCreate(Bundle icicle) {
+        super.onCreate(icicle);
+
+        mSelectedTab = CLOCK_TAB_INDEX;
+        if (icicle != null) {
+            mSelectedTab = icicle.getInt(KEY_SELECTED_TAB, CLOCK_TAB_INDEX);
         }
 
-        // Notify the current page to the indicator
-        this.mViewPagerIndicator.setCurrentPage(this.mViewPager.getCurrentItem());
+        // Timer receiver may ask the app to go to the timer fragment if a timer expired
+        Intent i = getIntent();
+        if (i != null) {
+            int tab = i.getIntExtra(SELECT_TAB_INTENT_EXTRA, -1);
+            if (tab != -1) {
+                mSelectedTab = tab;
+            }
+        }
+        initViews();
+        setHomeTimeZone();
     }
 
-    /**
-     * Method that sets the transparency of the {@link Fragmentable} items
-     *
-     * @param transparency The transparency (0-255)
-     */
-    private void setFragmentTransparency(int transparency) {
-        DeskClockPagerAdapter adapter = (DeskClockPagerAdapter)mViewPager.getAdapter();
-        for (int i=0; i<adapter.getCount(); i++) {
-            Fragment f = adapter.getFragment(i);
-            if (f instanceof Fragmentable) {
-                View v = ((Fragmentable)adapter.getFragment(i)).getRootView();
-                if (v != null && v.getBackground() != null) {
-                    v.getBackground().setAlpha(transparency);
-                    v.setAlpha(transparency);
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        Intent stopwatchIntent = new Intent(getApplicationContext(), StopwatchService.class);
+        stopwatchIntent.setAction(Stopwatches.KILL_NOTIF);
+        startService(stopwatchIntent);
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean(Timers.NOTIF_APP_OPEN, true);
+        editor.apply();
+        Intent timerIntent = new Intent();
+        timerIntent.setAction(Timers.NOTIF_IN_USE_CANCEL);
+        sendBroadcast(timerIntent);
+    }
+
+    @Override
+    public void onPause() {
+
+        Intent intent = new Intent(getApplicationContext(), StopwatchService.class);
+        intent.setAction(Stopwatches.SHOW_NOTIF);
+        startService(intent);
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean(Timers.NOTIF_APP_OPEN, false);
+        editor.apply();
+        Utils.showInUseNotifications(this);
+
+        super.onPause();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(KEY_SELECTED_TAB, mActionBar.getSelectedNavigationIndex());
+    }
+
+    public void clockButtonsOnClick(View v) {
+        if (v == null)
+            return;
+        switch (v.getId()) {
+            case R.id.alarms_button:
+                startActivity(new Intent(this, AlarmClock.class));
+                break;
+            case R.id.cities_button:
+                startActivity(new Intent(this, CitiesActivity.class));
+                break;
+            case R.id.menu_button:
+                showMenu(v);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void showMenu(View v) {
+        PopupMenu popupMenu = new PopupMenu(this, v);
+        popupMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener () {
+            @Override
+            public boolean onMenuItemClick(MenuItem item) {
+                switch (item.getItemId()) {
+                    case R.id.menu_item_settings:
+                        startActivity(new Intent(DeskClock.this, SettingsActivity.class));
+                        return true;
+                    case R.id.menu_item_help:
+                        Intent i = item.getIntent();
+                        if (i != null) {
+                            try {
+                                startActivity(i);
+                            } catch (ActivityNotFoundException e) {
+                                // No activity found to match the intent - ignore
+                            }
+                        }
+                        return true;
+                    case R.id.menu_item_night_mode:
+                        startActivity(new Intent(DeskClock.this, ScreensaverActivity.class));
+                    default:
+                        break;
                 }
+                return true;
             }
+        });
+        popupMenu.inflate(R.menu.desk_clock_menu);
+
+        Menu menu = popupMenu.getMenu();
+        MenuItem help = menu.findItem(R.id.menu_item_help);
+        if (help != null) {
+            Utils.prepareHelpMenuItem(this, help);
+        }
+        popupMenu.show();
+    }
+
+    /***
+     * Insert the local time zone as the Home Time Zone if one is not set
+     */
+    private void setHomeTimeZone() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String homeTimeZone = prefs.getString(SettingsActivity.KEY_HOME_TZ, "");
+        if (!homeTimeZone.isEmpty()) {
+        return;
+        }
+        homeTimeZone = TimeZone.getDefault().getID();
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(SettingsActivity.KEY_HOME_TZ, homeTimeZone);
+        editor.apply();
+        Log.v(LOG_TAG, "Setting home time zone to " + homeTimeZone);
+    }
+
+    public boolean isClockTab() {
+        return mViewPager.getCurrentItem() == CLOCK_TAB_INDEX;
+    }
+
+    /***
+     * Adapter for wrapping together the ActionBar's tab with the ViewPager
+     */
+
+    private class TabsAdapter extends FragmentPagerAdapter
+            implements ActionBar.TabListener, ViewPager.OnPageChangeListener {
+
+        private static final String KEY_TAB_POSITION = "tab_position";
+
+        final class TabInfo {
+            private final Class<?> clss;
+            private final Bundle args;
+
+            TabInfo(Class<?> _class, int position) {
+                clss = _class;
+                args = new Bundle();
+                args.putInt(KEY_TAB_POSITION, position);
+            }
+
+            public int getPosition() {
+                return args.getInt(KEY_TAB_POSITION, 0);
+            }
+        }
+
+        private final ArrayList<TabInfo> mTabs = new ArrayList <TabInfo>();
+        ActionBar mMainActionBar;
+        Context mContext;
+        ViewPager mPager;
+
+        public TabsAdapter(Activity activity, ViewPager pager) {
+            super(activity.getFragmentManager());
+            mContext = activity;
+            mMainActionBar = activity.getActionBar();
+            mPager = pager;
+            mPager.setAdapter(this);
+            mPager.setOnPageChangeListener(this);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            TabInfo info = mTabs.get(position);
+            DeskClockFragment f = (DeskClockFragment) Fragment.instantiate(
+                    mContext, info.clss.getName(), info.args);
+            return f;
+        }
+
+        @Override
+        public int getCount() {
+            return mTabs.size();
+        }
+
+        public void addTab(ActionBar.Tab tab, Class<?> clss, int position) {
+            TabInfo info = new TabInfo(clss, position);
+            tab.setTag(info);
+            tab.setTabListener(this);
+            mTabs.add(info);
+            mMainActionBar.addTab(tab);
+            notifyDataSetChanged();
+        }
+
+        @Override
+        public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+            // Do nothing
+        }
+
+        @Override
+        public void onPageSelected(int position) {
+            mMainActionBar.setSelectedNavigationItem(position);
+        }
+
+        @Override
+        public void onPageScrollStateChanged(int state) {
+            // Do nothing
+        }
+
+        @Override
+        public void onTabReselected(Tab arg0, FragmentTransaction arg1) {
+            // Do nothing
+        }
+
+        @Override
+        public void onTabSelected(Tab tab, FragmentTransaction ft) {
+            TabInfo info = (TabInfo)tab.getTag();
+            mPager.setCurrentItem(info.getPosition());
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
+            if (info.getPosition() == STOPWATCH_TAB_INDEX
+                    && prefs.getBoolean(SettingsActivity.KEY_KEEP_DISPLAY_ON_STOPWATCH, true)) {
+                getWindow().addFlags(LayoutParams.FLAG_KEEP_SCREEN_ON);
+            } else {
+                getWindow().clearFlags(LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
+        }
+
+        @Override
+        public void onTabUnselected(Tab arg0, FragmentTransaction arg1) {
+            // Do nothing
+
         }
     }
 
-    /**
-     * Method that powers on the screen
-     */
-    private void setWakeLock(boolean hold) {
-        if (DEBUG) Log.d(LOG_TAG,
-                (hold ? "hold" : " releas") + //$NON-NLS-1$ //$NON-NLS-2$
-                                "ing wake lock"); //$NON-NLS-1$
-        Window win = getWindow();
-        if (win != null) {
-            win.clearFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD |
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
-                    WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON |
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            win.addFlags(
-                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD |
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
-                    WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON |
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                );
+    public static abstract class OnTapListener implements OnTouchListener {
+        private float mLastTouchX;
+        private float mLastTouchY;
+        private long mLastTouchTime;
+        private TextView mMakePressedTextView;
+        private int mPressedColor, mGrayColor;
+        private final float MAX_MOVEMENT_ALLOWED = 20;
+        private final long MAX_TIME_ALLOWED = 500;
+
+        public OnTapListener(Activity activity, TextView makePressedView) {
+            mMakePressedTextView = makePressedView;
+            mPressedColor = activity.getResources().getColor(Utils.getPressedColorId());
+            mGrayColor = activity.getResources().getColor(Utils.getGrayColorId());
+        }
+
+        @Override
+        public boolean onTouch(View v, MotionEvent e) {
+            switch (e.getAction()) {
+                case (MotionEvent.ACTION_DOWN):
+                    mLastTouchTime = Utils.getTimeNow();
+                    mLastTouchX = e.getX();
+                    mLastTouchY = e.getY();
+                    if (mMakePressedTextView != null) {
+                        mMakePressedTextView.setTextColor(mPressedColor);
+                    }
+                    break;
+                case (MotionEvent.ACTION_UP):
+                    float xDiff = Math.abs(e.getX()-mLastTouchX);
+                    float yDiff = Math.abs(e.getY()-mLastTouchY);
+                    long timeDiff = (Utils.getTimeNow() - mLastTouchTime);
+                    if (xDiff < MAX_MOVEMENT_ALLOWED && yDiff < MAX_MOVEMENT_ALLOWED
+                            && timeDiff < MAX_TIME_ALLOWED) {
+                        if (mMakePressedTextView != null) {
+                            v = mMakePressedTextView;
+                        }
+                        processClick(v);
+                        resetValues();
+                        return true;
+                    }
+                    resetValues();
+                    break;
+                case (MotionEvent.ACTION_MOVE):
+                    xDiff = Math.abs(e.getX()-mLastTouchX);
+                    yDiff = Math.abs(e.getY()-mLastTouchY);
+                    if (xDiff >= MAX_MOVEMENT_ALLOWED || yDiff >= MAX_MOVEMENT_ALLOWED) {
+                        resetValues();
+                    }
+                    break;
+                default:
+                    resetValues();
+            }
+            return false;
+        }
+
+        private void resetValues() {
+            mLastTouchX = -1*MAX_MOVEMENT_ALLOWED + 1;
+            mLastTouchY = -1*MAX_MOVEMENT_ALLOWED + 1;
+            mLastTouchTime = -1*MAX_TIME_ALLOWED + 1;
+            if (mMakePressedTextView != null) {
+                mMakePressedTextView.setTextColor(mGrayColor);
+            }
+        }
+
+        protected abstract void processClick(View v);
+    }
+
+    /** Called by the LabelDialogFormat class after the dialog is finished. **/
+    @Override
+    public void onDialogLabelSet(TimerObj timer, String label, String tag) {
+        Fragment frag = getFragmentManager().findFragmentByTag(tag);
+        if (frag instanceof TimerFragment) {
+            ((TimerFragment) frag).setLabel(timer, label);
         }
     }
 }

@@ -16,19 +16,19 @@
 
 package com.android.deskclock;
 
+import static android.provider.AlarmClock.ACTION_SET_ALARM;
+import static android.provider.AlarmClock.EXTRA_HOUR;
+import static android.provider.AlarmClock.EXTRA_MESSAGE;
+import static android.provider.AlarmClock.EXTRA_MINUTES;
+import static android.provider.AlarmClock.EXTRA_SKIP_UI;
+
 import android.app.Activity;
-import android.content.Context;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import static android.provider.AlarmClock.ACTION_SET_ALARM;
-import static android.provider.AlarmClock.EXTRA_HOUR;
-import static android.provider.AlarmClock.EXTRA_MESSAGE;
-import static android.provider.AlarmClock.EXTRA_MINUTES;
-import static android.provider.AlarmClock.EXTRA_SKIP_UI;
 
 import java.util.Calendar;
 
@@ -89,7 +89,7 @@ public class HandleSetAlarm extends Activity {
         values.put(Alarm.Columns.VIBRATE, 1);
         values.put(Alarm.Columns.DAYS_OF_WEEK, 0);
         values.put(Alarm.Columns.ALARM_TIME, timeInMillis);
-		values.put(Alarm.Columns.INCVOL, 0);
+        values.put(Alarm.Columns.INCVOL, 0);
 
         ContentResolver cr = getContentResolver();
         Uri result = cr.insert(Alarm.Columns.CONTENT_URI, values);
@@ -97,7 +97,7 @@ public class HandleSetAlarm extends Activity {
             try {
                 c = cr.query(result, Alarm.Columns.ALARM_QUERY_COLUMNS, null,
                         null, null);
-                handleCursorResult(c, timeInMillis, true, skipUi);
+                handleCursorResult(c, timeInMillis, false, skipUi);
             } finally {
                 if (c != null) c.close();
             }
@@ -114,11 +114,11 @@ public class HandleSetAlarm extends Activity {
                 Alarms.enableAlarm(this, alarm.id, true);
                 alarm.enabled = true;
             }
-            SetAlarm.popAlarmSetToast(this, timeInMillis);
+            AlarmUtils.popAlarmSetToast(this, timeInMillis);
             if (skipUi) {
                 Alarms.setAlarm(this, alarm);
             } else {
-                Intent i = new Intent(this, SetAlarm.class);
+                Intent i = new Intent(this, AlarmClock.class);
                 i.putExtra(Alarms.ALARM_INTENT_EXTRA, alarm);
                 startActivity(i);
             }
