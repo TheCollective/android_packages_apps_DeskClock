@@ -169,6 +169,13 @@
     <!-- Label for analog clock gadget displayed on-screen when that gadget is represented to the user. -->
     <string name="analog_gadget">Analog clock</string>
 
+    <!-- Label for AOCP clock gadget, shown in list of all gadgets -->
+    <string name="analog_aocp_gadget">AOCP clock</string>
+    
+    <!-- Appears at the top of the AOCP Clock Picker screen: Tell user to
+         select a clock Dial to display -->
+    <string name="clock_dial_instructions">Choose a clock dial</string>
+
     <!-- Help activity name -->
     <string name="help">help</string>
 
