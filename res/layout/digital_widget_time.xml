@@ -46,7 +46,7 @@
             android:format24Hour="@string/widget_24_hours_format_m"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            style="@style/widget_big_thin"
+            style="@style/widget_big_bold"
             android:textColor="@color/clock_white"
             android:layout_gravity="center_horizontal|top"
              />
