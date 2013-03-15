@@ -22,12 +22,15 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.media.AudioManager;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceScreen;
+import android.preference.RingtonePreference;
 import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.view.Menu;
@@ -58,6 +61,8 @@ public class SettingsActivity extends PreferenceActivity
             "shake_action";
     static final String KEY_VOLUME_BEHAVIOR =
             "volume_button_setting";
+    static final String KEY_DEFAULT_RINGTONE =
+            "default_ringtone";
     static final String KEY_AUTO_SILENCE =
             "auto_silence";
     public static final String KEY_CLOCK_STYLE =
@@ -86,7 +91,14 @@ public class SettingsActivity extends PreferenceActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         addPreferencesFromResource(R.xml.settings);
-
+        final AlarmPreference ringtone =
+                (AlarmPreference) findPreference(KEY_DEFAULT_RINGTONE);
+        Uri alert = RingtoneManager.getActualDefaultRingtoneUri(this,
+                RingtoneManager.TYPE_ALARM);
+        if (alert != null) {
+            ringtone.setAlert(alert);
+        }
+        ringtone.setChangeDefault();
         ActionBar actionBar = getActionBar();
         if (actionBar != null) {
             actionBar.setDisplayOptions(ActionBar.DISPLAY_HOME_AS_UP, ActionBar.DISPLAY_HOME_AS_UP);

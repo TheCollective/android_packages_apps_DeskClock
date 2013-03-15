@@ -174,11 +174,13 @@ public class AlarmKlaxon extends Service {
     private void play(Alarm alarm) {
         // stop() checks to see if we are already playing.
         stop();
-
+		Uri alert = alarm.alert;
+        alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        
         Log.d(TAG, "AlarmKlaxon.play() " + alarm.id + " alert " + alarm.alert);
 
         if (!alarm.silent) {
-            Uri alert = alarm.alert;
+  //          Uri alert = alarm.alert;
             // Fall back on the default alarm if the database does not have an
             // alarm stored.
             if (alert == null) {
