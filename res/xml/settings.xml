@@ -82,14 +82,6 @@
             android:entries="@array/volume_button_setting_entries"
             android:entryValues="@array/volume_button_setting_values"
             android:defaultValue="1" />
-	    
-	<com.android.deskclock.AlarmPreference
-           android:key="default_ringtone"
-           android:title="@string/default_ringtone_setting_title"
-           android:ringtoneType="alarm"
-           android:showDefault="false"
-           android:persistent="false"
-           android:showSilent="true" />    
 
         <CheckBoxPreference
             android:key="show_status_bar_icon"

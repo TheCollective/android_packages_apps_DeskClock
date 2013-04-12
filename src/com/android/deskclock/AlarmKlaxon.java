@@ -33,22 +33,21 @@ import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
-import android.util.Log;
+import android.text.format.DateUtils;
 
 /**
  * Manages alarms and vibe. Runs as a service so that it can continue to play
  * if another activity overrides the AlarmAlert dialog.
  */
 public class AlarmKlaxon extends Service {
-	private static String TAG = "AlarmKlaxon";
     // Default of 10 minutes until alarm is silenced.
     private static final String DEFAULT_ALARM_TIMEOUT = "10";
 
     private static final long[] sVibratePattern = new long[] { 500, 500 };
 
     private static final long INCVOL_DELAY = 5000; // 5sec * 7 volume levels = 30sec till max volume
-    private static final int INCVOL_START = 1; // default was 0.1f
-    private static final int INCVOL_DELTA = 1; // default was 0.01f
+    private static final int INCVOL_START = 1;
+    private static final int INCVOL_DELTA = 1;
 
     private boolean mPlaying = false;
     private Vibrator mVibrator;
@@ -58,29 +57,35 @@ public class AlarmKlaxon extends Service {
     private long mStartTime;
     private TelephonyManager mTelephonyManager;
     private int mInitialCallState;
-    private int mCurrentIncVol = 1;
-    private int mAlarmVolumeSetting;
+    private int mCurrentVolume;
+    private int mAlarmVolumeSetting = -1;
 
     // Internal messages
     private static final int KILLER = 1000;
-    private static final int INCVOL = 1001;
+    private static final int INCREASE_VOLUME = 1001;
+
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case KILLER:
-                    Log.d(TAG, "*********** Alarm killer triggered ***********");
+                    if (Log.LOGV) {
+                        Log.v("*********** Alarm killer triggered ***********");
+                    }
 
-                    sendKillBroadcast((Alarm) msg.obj);
+                    sendKillBroadcast((Alarm) msg.obj, false);
                     stopSelf();
                     break;
-                case INCVOL:
+                case INCREASE_VOLUME:
                     if (mPlaying && mMediaPlayer != null && mMediaPlayer.isPlaying()) {
-                        mCurrentIncVol += INCVOL_DELTA;
-                        mHandler.sendEmptyMessageDelayed(INCVOL, INCVOL_DELAY);
-                        Log.d(TAG, "mCurrentIncVol "+mCurrentIncVol);
-                        mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mCurrentIncVol, 0);
-                        Log.d(TAG, "vol "+ mAudioManager.getStreamVolume(AudioManager.STREAM_ALARM));
+                        mCurrentVolume += INCVOL_DELTA;
+                        if (Log.LOGV) {
+                            Log.v("Increasing alarm volume to " + mCurrentVolume);
+                        }
+                        mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mCurrentVolume, 0);
+                        if (mCurrentVolume < mAlarmVolumeSetting) {
+                            mHandler.sendEmptyMessageDelayed(INCREASE_VOLUME, INCVOL_DELAY);
+                        }
                     }
                     break;
             }
@@ -96,7 +101,7 @@ public class AlarmKlaxon extends Service {
             // we don't kill the alarm during a call.
             if (state != TelephonyManager.CALL_STATE_IDLE
                     && state != mInitialCallState) {
-                sendKillBroadcast(mCurrentAlarm);
+                sendKillBroadcast(mCurrentAlarm, false);
                 stopSelf();
             }
         }
@@ -104,6 +109,7 @@ public class AlarmKlaxon extends Service {
 
     @Override
     public void onCreate() {
+        mAudioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
         mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         // Listen for incoming calls to kill the alarm.
         mTelephonyManager =
@@ -141,13 +147,13 @@ public class AlarmKlaxon extends Service {
                 Alarms.ALARM_INTENT_EXTRA);
 
         if (alarm == null) {
-            Log.d(TAG, "AlarmKlaxon failed to parse the alarm from the intent");
+            Log.v("AlarmKlaxon failed to parse the alarm from the intent");
             stopSelf();
             return START_NOT_STICKY;
         }
 
         if (mCurrentAlarm != null) {
-            sendKillBroadcast(mCurrentAlarm);
+            sendKillBroadcast(mCurrentAlarm, true);
         }
 
         play(alarm);
@@ -159,12 +165,13 @@ public class AlarmKlaxon extends Service {
         return START_STICKY;
     }
 
-    private void sendKillBroadcast(Alarm alarm) {
+    private void sendKillBroadcast(Alarm alarm, boolean replaced) {
         long millis = System.currentTimeMillis() - mStartTime;
-        int minutes = (int) Math.round(millis / 60000.0);
+        int minutes = (int) Math.round(millis / (double)DateUtils.MINUTE_IN_MILLIS);
         Intent alarmKilled = new Intent(Alarms.ALARM_KILLED);
         alarmKilled.putExtra(Alarms.ALARM_INTENT_EXTRA, alarm);
         alarmKilled.putExtra(Alarms.ALARM_KILLED_TIMEOUT, minutes);
+        alarmKilled.putExtra(Alarms.ALARM_REPLACED, replaced);
         sendBroadcast(alarmKilled);
     }
 
@@ -174,24 +181,22 @@ public class AlarmKlaxon extends Service {
     private void play(Alarm alarm) {
         // stop() checks to see if we are already playing.
         stop();
-		Uri alert = alarm.alert;
-        alert = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-        
-        Log.d(TAG, "AlarmKlaxon.play() " + alarm.id + " alert " + alarm.alert);
+
+        if (Log.LOGV) {
+            Log.v("AlarmKlaxon.play() " + alarm.id + " alert " + alarm.alert);
+        }
 
         if (!alarm.silent) {
-  //          Uri alert = alarm.alert;
+            Uri alert = alarm.alert;
             // Fall back on the default alarm if the database does not have an
             // alarm stored.
             if (alert == null) {
                 alert = RingtoneManager.getDefaultUri(
                         RingtoneManager.TYPE_ALARM);
-                Log.d(TAG, "Using default alarm: " + alert.toString());
+                if (Log.LOGV) {
+                    Log.v("Using default alarm: " + alert.toString());
+                }
             }
-
-                mAudioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
-                // save current value
-                mAlarmVolumeSetting = mAudioManager.getStreamVolume(AudioManager.STREAM_ALARM);
 
             // TODO: Reuse mMediaPlayer instead of creating a new one and/or use
             // RingtoneManager.
@@ -199,7 +204,7 @@ public class AlarmKlaxon extends Service {
             mMediaPlayer.setOnErrorListener(new OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
-                    Log.e(TAG, "Error occurred while playing audio.");
+                    Log.e("Error occurred while playing audio.");
                     mp.stop();
                     mp.release();
                     mMediaPlayer = null;
@@ -212,21 +217,16 @@ public class AlarmKlaxon extends Service {
                 // resource at a low volume to not disrupt the call.
                 if (mTelephonyManager.getCallState()
                         != TelephonyManager.CALL_STATE_IDLE) {
-                    Log.d(TAG, "Using the in-call alarm");
+                    Log.v("Using the in-call alarm");
                     mMediaPlayer.setVolume(IN_CALL_VOLUME, IN_CALL_VOLUME);
                     setDataSourceFromResource(getResources(), mMediaPlayer,
                             R.raw.in_call_alarm);
                 } else {
                     mMediaPlayer.setDataSource(this, alert);
-
-                    if (alarm.incvol) {
-                        mCurrentIncVol = INCVOL_START; // To start from desired setting use mAlarmVolumeSetting
-                        mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mCurrentIncVol, 0);
-                    }
                 }
-                startAlarm(mMediaPlayer);
+                startAlarm(mMediaPlayer, alarm.increasingVolume);
             } catch (Exception ex) {
-                Log.d(TAG, "Using the fallback ringtone");
+                Log.v("Using the fallback ringtone");
                 // The alert may be on the sd card which could be busy right
                 // now. Use the fallback ringtone.
                 try {
@@ -234,16 +234,10 @@ public class AlarmKlaxon extends Service {
                     mMediaPlayer.reset();
                     setDataSourceFromResource(getResources(), mMediaPlayer,
                             R.raw.fallbackring);
-
-                    if (alarm.incvol) {
-                        mCurrentIncVol = INCVOL_START;
-                        mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mCurrentIncVol, 0);
-                    }
-
-                    startAlarm(mMediaPlayer);
+                    startAlarm(mMediaPlayer, alarm.increasingVolume);
                 } catch (Exception ex2) {
                     // At this point we just don't play anything.
-                    Log.e(TAG, "Failed to play fallback ringtone", ex2);
+                    Log.e("Failed to play fallback ringtone", ex2);
                 }
             }
         }
@@ -258,24 +252,26 @@ public class AlarmKlaxon extends Service {
         enableKiller(alarm);
         mPlaying = true;
         mStartTime = System.currentTimeMillis();
-
-        if (alarm.incvol) {
-            mHandler.sendEmptyMessageDelayed(INCVOL, INCVOL_DELAY);
-        }
     }
 
     // Do the common stuff when starting the alarm.
-    private void startAlarm(MediaPlayer player)
+    private void startAlarm(MediaPlayer player, boolean useIncreasingVolume)
             throws java.io.IOException, IllegalArgumentException,
                    IllegalStateException {
         // do not play alarms if stream volume is 0
         // (typically because ringer mode is silent).
-        if (mAudioManager.getStreamVolume(AudioManager.STREAM_ALARM) != 0) {
-            player.setAudioStreamType(AudioManager.STREAM_ALARM);
-            player.setLooping(true);
-            player.prepare();
-            player.start();
+        if (mAudioManager.getStreamVolume(AudioManager.STREAM_ALARM) == 0) {
+            return;
         }
+
+        if (useIncreasingVolume) {
+            startVolumeIncrease();
+        }
+
+        player.setAudioStreamType(AudioManager.STREAM_ALARM);
+        player.setLooping(true);
+        player.prepare();
+        player.start();
     }
 
     private void setDataSourceFromResource(Resources resources,
@@ -293,26 +289,22 @@ public class AlarmKlaxon extends Service {
      * repeating
      */
     public void stop() {
-        Log.d(TAG, "AlarmKlaxon.stop()");
+        if (Log.LOGV) Log.v("AlarmKlaxon.stop()");
         if (mPlaying) {
             mPlaying = false;
-
-            mHandler.removeMessages(INCVOL);
 
             // Stop audio playing
             if (mMediaPlayer != null) {
                 mMediaPlayer.stop();
                 mMediaPlayer.release();
                 mMediaPlayer = null;
-
-                // reset to default from before
-                mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mAlarmVolumeSetting, 0);
             }
 
             // Stop vibrator
             mVibrator.cancel();
         }
         disableKiller();
+        stopVolumeIncrease();
     }
 
     /**
@@ -330,7 +322,7 @@ public class AlarmKlaxon extends Service {
         int autoSnoozeMinutes = Integer.parseInt(autoSnooze);
         if (autoSnoozeMinutes != -1) {
             mHandler.sendMessageDelayed(mHandler.obtainMessage(KILLER, alarm),
-                    1000 * autoSnoozeMinutes * 60);
+                    autoSnoozeMinutes * DateUtils.MINUTE_IN_MILLIS);
         }
     }
 
@@ -338,5 +330,21 @@ public class AlarmKlaxon extends Service {
         mHandler.removeMessages(KILLER);
     }
 
+    private void startVolumeIncrease() {
+        // save current value
+        mAlarmVolumeSetting = mAudioManager.getStreamVolume(AudioManager.STREAM_ALARM);
 
+        mCurrentVolume = INCVOL_START;
+        mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mCurrentVolume, 0);
+        mHandler.sendEmptyMessageDelayed(INCREASE_VOLUME, INCVOL_DELAY);
+    }
+
+    private void stopVolumeIncrease() {
+        mHandler.removeMessages(INCREASE_VOLUME);
+        if (mAlarmVolumeSetting >= 0) {
+            // reset to default from before
+            mAudioManager.setStreamVolume(AudioManager.STREAM_ALARM, mAlarmVolumeSetting, 0);
+            mAlarmVolumeSetting = -1;
+        }
+    }
 }
