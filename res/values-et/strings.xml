@@ -131,6 +131,10 @@
     <string name="menu_item_settings" msgid="1413723516369078665">"Seaded"</string>
     <string name="menu_item_help" msgid="4570953476186849841">"Abi"</string>
     <string name="menu_item_night_mode" msgid="3486930302245398975">"Öörežiim"</string>
+    <!-- no translation found for menu_item_sort_by_gmt_offset (3120860422682721706) -->
+    <skip />
+    <!-- no translation found for menu_item_sort_by_name (1762931290495104106) -->
+    <skip />
     <string name="sw_resume_button" msgid="2569360966002022248">"Jätka"</string>
     <string name="sw_start_button" msgid="8373422516681242270">"Alusta"</string>
     <string name="sw_stop_button" msgid="8322958613123274451">"Peata"</string>
@@ -184,10 +188,8 @@
     <item quantity="one" msgid="6764708652976799977">"1 minut"</item>
     <item quantity="other" msgid="3799129667336330616">"<xliff:g id="NUMBER">%d</xliff:g> taimerit"</item>
   </plurals>
-    <string name="home_label" msgid="4436139365695453870">"Koduleht"</string>
+    <string name="home_label" msgid="4436139365695453870">"Kodu"</string>
     <string name="cities_activity_title" msgid="8552462751129256730">"Linnad"</string>
-    <string name="alarm_on" msgid="4344630320756422804">"SEES"</string>
-    <string name="alarm_off" msgid="6478058633710013612">"VÄLJAS"</string>
     <string name="clock_settings" msgid="8887845806151785393">"KELL"</string>
     <string name="clock_style" msgid="2265011060429742344">"Stiil"</string>
   <string-array name="clock_style_entries">

@@ -20,6 +20,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:clickable="true"
+    android:paddingStart="8dip"
     android:paddingLeft="8dip"
-    android:paddingRight="32dip"
-    android:clipToPadding="false" />
+    android:clipToPadding="false"
+    />

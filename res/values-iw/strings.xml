@@ -19,6 +19,7 @@
     <string name="app_label" msgid="6674495003718166674">"שעון"</string>
     <string name="alarm_list_title" msgid="7589940465292950600">"התראות"</string>
     <string name="add_alarm" msgid="5976616107390962899">"הוסף צלצול"</string>
+    <string name="alarm_timeline_title_text" msgid="595912293949219821">"ההתראות הבאות"</string>
     <string name="menu_desk_clock" msgid="3241995064554071588">"שעון שולחני"</string>
     <string name="menu_edit_alarm" msgid="7204602994918829751">"ערוך התראה"</string>
     <string name="delete_alarm" msgid="3457780990646206817">"מחק התראה"</string>
@@ -36,10 +37,14 @@
     <string name="ringtone" msgid="9110746249688559579">"רינגטון"</string>
     <string name="time" msgid="8067216534232296518">"שעה"</string>
     <string name="alarm_alert_dismiss_text" msgid="4942914605480888820">"דחה"</string>
-    <string name="alarm_alert_alert_silenced" msgid="2704775170733835993">"ההתראה הושתקה לאחר <xliff:g id="MINUTES">%d</xliff:g> דקות."</string>
-    <string name="alarm_alert_snooze_text" msgid="1774416052207651584">"העבר למצב נמנום"</string>
+    <string name="alarm_alert_dismiss_now_text" msgid="3272183025444682500">"סגור כעת"</string>
+    <string name="alarm_missed_title" msgid="3828345099754063392">"החמצת התראה"</string>
+    <string name="alarm_missed_text" msgid="6585658367289194023">"<xliff:g id="ALARM_TIME">%s</xliff:g> ‏- <xliff:g id="ALARM_LABEL">%s</xliff:g>"</string>
+    <string name="alarm_alert_snooze_text" msgid="1774416052207651584">"נודניק"</string>
     <string name="alarm_alert_snooze_set" msgid="656470966696912087">"עובר למצב נמנום למשך <xliff:g id="MINUTES">%d</xliff:g> דקות."</string>
     <string name="alarm_alert_snooze_until" msgid="6958013659168344550">"מצב נמנום עד <xliff:g id="TIME">%s</xliff:g>"</string>
+    <string name="alarm_alert_predismiss_title" msgid="5723945586913705445">"התראה קרובה"</string>
+    <string name="missed_alarm_has_been_deleted" msgid="5295473204045979335">"ההתראה שהחמצת נמחקה"</string>
   <string-array name="timer_notifications">
     <item msgid="7760558912503484257">"נותרה פחות מדקה"</item>
     <item msgid="83197792732433351">"נותרו <xliff:g id="HOURS">%1$s</xliff:g>"</item>
@@ -69,7 +74,7 @@
     <string name="analog_gadget" msgid="1670505720837152766">"שעון אנלוגי"</string>
     <string name="help" msgid="7786263119482654015">"עזרה"</string>
     <string name="settings" msgid="5849739030579520686">"הגדרות"</string>
-    <string name="snooze_duration_title" msgid="1097309861110780483">"משך מצב נמנום"</string>
+    <string name="snooze_duration_title" msgid="1097309861110780483">"משך הנדנוד"</string>
   <plurals name="snooze_duration">
     <item quantity="one" msgid="7406963706727564418">"דקה אחת"</item>
     <item quantity="other" msgid="568504136093419703">"<xliff:g id="NUMBER">%d</xliff:g> דקות"</item>
@@ -95,17 +100,17 @@
     <string name="delete" msgid="5732434972457000541">"מחק"</string>
     <string name="alarm_volume_title" msgid="8506245173912428522">"עוצמת קול של התראה"</string>
     <string name="silent_alarm_summary" msgid="8605302849408279221">"שקט"</string>
-    <string name="alarm_notify_text" msgid="4891014685945904766">"העבר למצב נמנום או בטל את ההתראה."</string>
+    <string name="alarm_notify_text" msgid="4891014685945904766">"נודניק או ביטול ההתראה."</string>
     <string name="alarm_notify_snooze_label" msgid="5404083762646377829">"<xliff:g id="LABEL">%s</xliff:g> (מצב נמנום)"</string>
     <string name="alarm_notify_snooze_text" msgid="4819324081410990368">"ההתראה מכוונת לשעה <xliff:g id="TIME">%s</xliff:g>. גע כדי לבטל."</string>
     <string name="volume_button_setting_title" msgid="6937131248843413357">"לחצני עוצמת קול"</string>
     <string name="volume_button_dialog_title" msgid="8768042543750036853">"פעולת הלחצן"</string>
   <string-array name="volume_button_setting_entries">
-    <item msgid="7972756698723318690">"העבר למצב נמנום"</item>
+    <item msgid="7972756698723318690">"נודניק"</item>
     <item msgid="3450979320164769576">"דחה"</item>
     <item msgid="6302517608411378024">"אל תעשה דבר"</item>
   </string-array>
-    <string name="default_ringtone_setting_title" msgid="4549726190682964245">"קבע צלצול ברירת מחדל"</string>
+    <string name="default_ringtone_setting_title" msgid="4549726190682964245">"צליל ברירת מחדל"</string>
     <string name="alarm_button_description" msgid="740283647046258651">"התראות"</string>
     <string name="gallery_button_description" msgid="1151743663255257668">"גלריה"</string>
     <string name="music_button_description" msgid="1626593420810117999">"מוסיקה"</string>
@@ -122,6 +127,7 @@
     <string name="control_set_alarm" msgid="2194676418924016327">"הגדר צלצול"</string>
     <!-- no translation found for control_set_alarm_with_existing (3359285346655630660) -->
     <skip />
+    <string name="menu_alarm" msgid="4772010125376647519">"התראה"</string>
     <string name="menu_timer" msgid="6459070074762877114">"טיימר"</string>
     <string name="menu_clock" msgid="5612760670606829805">"שעון"</string>
     <string name="menu_stopwatch" msgid="3396117705293574701">"שעון עצר"</string>
@@ -131,6 +137,9 @@
     <string name="menu_item_settings" msgid="1413723516369078665">"הגדרות"</string>
     <string name="menu_item_help" msgid="4570953476186849841">"עזרה"</string>
     <string name="menu_item_night_mode" msgid="3486930302245398975">"מצב לילה"</string>
+    <string name="menu_item_sort_by_gmt_offset" msgid="3120860422682721706">"מיין לפי שעה"</string>
+    <string name="menu_item_sort_by_name" msgid="1762931290495104106">"מיין לפי שם"</string>
+    <string name="selected_cities_label" msgid="3607479399424246605">"ערים נבחרות"</string>
     <string name="sw_resume_button" msgid="2569360966002022248">"המשך"</string>
     <string name="sw_start_button" msgid="8373422516681242270">"התחל"</string>
     <string name="sw_stop_button" msgid="8322958613123274451">"עצור"</string>
@@ -144,7 +153,7 @@
     <string name="minutes_label_description" msgid="965686733490357796">"דקות"</string>
     <string name="seconds_label_description" msgid="3821620053141299692">"שניות"</string>
     <string name="zero" msgid="7102083421938355017">"0"</string>
-    <string name="sw_share_main" msgid="7703563468204234405">"השעה שלי הוא <xliff:g id="TIME">%s</xliff:g>"</string>
+    <string name="sw_share_main" msgid="7703563468204234405">"הזמן שלי הוא <xliff:g id="TIME">%s</xliff:g>"</string>
     <string name="sw_share_laps" msgid="614390674795945007">"זמני הקפה:"</string>
     <string name="sw_notification_lap_number" msgid="3535420316052647126">"הקפה <xliff:g id="NUMBER">%d</xliff:g>"</string>
   <plurals name="Nhours_description">
@@ -163,7 +172,9 @@
     <string name="timer_start" msgid="6158486445614356442">"התחל"</string>
     <string name="timer_delete" msgid="8699122001991909302">"מחק"</string>
     <string name="timer_plus_one" msgid="6631211310420106116">"הוסף דקה"</string>
+    <string name="timer_plus_1_min" msgid="8645224089494875062">"הוסף דקה"</string>
     <string name="timer_stop" msgid="3361154678667736722">"עצור"</string>
+    <string name="timer_done" msgid="2375990511982914051">"בוצע"</string>
     <string name="timer_reset" msgid="7848424809190171640">"אפס"</string>
     <string name="timer_cancel" msgid="3572868404230815644">"בטל"</string>
     <string name="timer_times_up" msgid="9190440395938519009">"הזמן נגמר"</string>
@@ -184,10 +195,8 @@
     <item quantity="one" msgid="6764708652976799977">"דקה אחת"</item>
     <item quantity="other" msgid="3799129667336330616">"<xliff:g id="NUMBER">%d</xliff:g> טיימרים"</item>
   </plurals>
-    <string name="home_label" msgid="4436139365695453870">"בית"</string>
+    <string name="home_label" msgid="4436139365695453870">"מקומי"</string>
     <string name="cities_activity_title" msgid="8552462751129256730">"ערים"</string>
-    <string name="alarm_on" msgid="4344630320756422804">"פועלת"</string>
-    <string name="alarm_off" msgid="6478058633710013612">"כבויה"</string>
     <string name="clock_settings" msgid="8887845806151785393">"שעון"</string>
     <string name="clock_style" msgid="2265011060429742344">"סגנון"</string>
   <string-array name="clock_style_entries">
@@ -289,15 +298,16 @@
     <item msgid="8255615641810148152">"אוקלנד"</item>
     <item msgid="3027153773466391728">"פיג\'י"</item>
     <item msgid="5911600083231840181">"טונגה"</item>
+    <item msgid="5176858645450908751">"ג\'אקארטה"</item>
   </string-array>
     <string name="alarm_settings" msgid="6049627772103646753">"התראות"</string>
     <string name="see_all" msgid="775983396630163739">"הצג הכל…"</string>
     <string name="stopwatch_service_desc" msgid="8416624630388063996">"שירות שעון עצר להפעלת ההתראה."</string>
     <string name="swn_stopped" msgid="783124901663086172">"נעצר"</string>
     <string name="description_direction_right" msgid="1615911557926085934">"החלק ימינה כדי לסגור"</string>
-    <string name="description_direction_left" msgid="6328816971226781776">"החלק שמאלה כדי להעביר למצב נמנום"</string>
+    <string name="description_direction_left" msgid="6328816971226781776">"החלק שמאלה כדי לעבור למצב נודניק"</string>
     <string name="description_direction_up" msgid="7875287578324520904">"החלק מעלה כדי לסגור"</string>
-    <string name="description_direction_down" msgid="8240473964024874053">"החלק מטה כדי להעביר למצב נמנום"</string>
+    <string name="description_direction_down" msgid="8240473964024874053">"החלק מטה כדי לעבור למצב נודניק"</string>
     <string name="timer_stopped" msgid="2730331837832462008">"טיימר נעצר"</string>
     <string name="timers_stopped" msgid="2393640808691864520">"<xliff:g id="NUMBER">%d</xliff:g> טיימרים נעצרו"</string>
     <string name="all_timers_stopped_notif" msgid="278532320068394600">"גע כדי לראות את הטיימרים שלך"</string>
@@ -323,14 +333,6 @@
     <string name="timer_delete_confirmation" msgid="2815524107015816453">"האם למחוק את הטיימר הזה?"</string>
     <string name="city_delete_confirmation" msgid="1783441538785676299">"האם להסיר את העיר הזאת?"</string>
     <string name="digital_gadget" msgid="2326954556720571358">"שעון דיגיטלי"</string>
-
-    <!-- **** CYANOGENMOD ADDITIONS START **** -->
-
-    <!-- Setting title for showing/hiding the alarm status bar icon -->
-    <string name="show_status_bar_icon_title">הצג סמל</string>
-    <!-- Setting summary for showing/hiding the alarm statusbar icon -->
-    <string name="show_status_bar_icon_summary">הצג סמל בשורת המצב כשיש התראה מוגדרת</string>
-
-    <!-- **** CYANOGENMOD ADDITIONS END **** -->
-
+    <string name="no_alarms" msgid="6429431324842022917">"ללא התראות"</string>
+    <string name="no_upcoming_alarms" msgid="2889840988069436254">"אין התראות קרובות"</string>
 </resources>

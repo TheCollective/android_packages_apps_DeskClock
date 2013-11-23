@@ -131,6 +131,10 @@
     <string name="menu_item_settings" msgid="1413723516369078665">"Tetapan"</string>
     <string name="menu_item_help" msgid="4570953476186849841">"Bantuan"</string>
     <string name="menu_item_night_mode" msgid="3486930302245398975">"Mod malam"</string>
+    <!-- no translation found for menu_item_sort_by_gmt_offset (3120860422682721706) -->
+    <skip />
+    <!-- no translation found for menu_item_sort_by_name (1762931290495104106) -->
+    <skip />
     <string name="sw_resume_button" msgid="2569360966002022248">"Sambung semula"</string>
     <string name="sw_start_button" msgid="8373422516681242270">"Mula"</string>
     <string name="sw_stop_button" msgid="8322958613123274451">"Berhenti"</string>
@@ -184,10 +188,8 @@
     <item quantity="one" msgid="6764708652976799977">"1 minit"</item>
     <item quantity="other" msgid="3799129667336330616">"<xliff:g id="NUMBER">%d</xliff:g> pemasa"</item>
   </plurals>
-    <string name="home_label" msgid="4436139365695453870">"Laman Utama"</string>
+    <string name="home_label" msgid="4436139365695453870">"Tempatan"</string>
     <string name="cities_activity_title" msgid="8552462751129256730">"Bandar"</string>
-    <string name="alarm_on" msgid="4344630320756422804">"HIDUPKAN"</string>
-    <string name="alarm_off" msgid="6478058633710013612">"MATIKAN"</string>
     <string name="clock_settings" msgid="8887845806151785393">"JAM"</string>
     <string name="clock_style" msgid="2265011060429742344">"Gaya"</string>
   <string-array name="clock_style_entries">

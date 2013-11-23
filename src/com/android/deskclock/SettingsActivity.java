@@ -17,12 +17,9 @@
 package com.android.deskclock;
 
 import android.app.ActionBar;
-import android.appwidget.AppWidgetManager;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.media.AudioManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
@@ -41,8 +38,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
 
-import net.margaritov.preference.colorpicker.ColorPickerPreference;
-
 /**
  * Settings for the Alarm Clock.
  */
@@ -52,19 +47,13 @@ public class SettingsActivity extends PreferenceActivity
     private static final int ALARM_STREAM_TYPE_BIT =
             1 << AudioManager.STREAM_ALARM;
 
-    static final String KEY_ALARM_IN_SILENT_MODE =
+    public static final String KEY_ALARM_IN_SILENT_MODE =
             "alarm_in_silent_mode";
-    static final String KEY_SHOW_STATUS_BAR_ICON =
-            "show_status_bar_icon";
-    static final String KEY_ALARM_SNOOZE =
+    public static final String KEY_ALARM_SNOOZE =
             "snooze_duration";
-    static final String KEY_FLIP_ACTION =
-            "flip_action";
-    static final String KEY_SHAKE_ACTION =
-            "shake_action";
-    static final String KEY_VOLUME_BEHAVIOR =
+    public static final String KEY_VOLUME_BEHAVIOR =
             "volume_button_setting";
-    static final String KEY_AUTO_SILENCE =
+    public static final String KEY_AUTO_SILENCE =
             "auto_silence";
     public static final String KEY_CLOCK_STYLE =
             "clock_style";
@@ -72,17 +61,10 @@ public class SettingsActivity extends PreferenceActivity
             "home_time_zone";
     public static final String KEY_AUTO_HOME_CLOCK =
             "automatic_home_clock";
-    public static final String KEY_KEEP_DISPLAY_ON_STOPWATCH =
-            "keep_display_on_stopwatch";
-    public static final String DEFAULT_VOLUME_BEHAVIOR = "0";			
-    static final String KEY_VOLUME_BUTTONS =
+    public static final String KEY_VOLUME_BUTTONS =
             "volume_button_setting";
-    static final String KEY_DIGITAL_CLOCK_TIME_COLOR =
-            "digital_clock_time_color";
-    static final String KEY_DIGITAL_CLOCK_DATE_COLOR =
-            "digital_clock_date_color";
-    static final String KEY_DIGITAL_CLOCK_ALARM_COLOR =
-            "digital_clock_alarm_color";
+
+    public static final String DEFAULT_VOLUME_BEHAVIOR = "0";
 
     private static CharSequence[][] mTimezones;
     private long mTime;
@@ -191,30 +173,14 @@ public class SettingsActivity extends PreferenceActivity
             final ListPreference listPref = (ListPreference) pref;
             final int idx = listPref.findIndexOfValue((String) newValue);
             listPref.setSummary(listPref.getEntries()[idx]);
-        } else if (KEY_FLIP_ACTION.equals(pref.getKey())) {
-            final ListPreference listPref = (ListPreference) pref;
-            String action = (String) newValue;
-            updateActionSummary(listPref, action, R.string.flip_action_summary);
-        } else if (KEY_SHAKE_ACTION.equals(pref.getKey())) {
-            final ListPreference listPref = (ListPreference) pref;
-            String action = (String) newValue;
-            updateActionSummary(listPref, action, R.string.shake_action_summary);
-        } else if (KEY_DIGITAL_CLOCK_TIME_COLOR.equals(pref.getKey())
-                || KEY_DIGITAL_CLOCK_DATE_COLOR.equals(pref.getKey())
-                || KEY_DIGITAL_CLOCK_ALARM_COLOR.equals(pref.getKey())) {
-            AppWidgetManager widgetManager = AppWidgetManager.getInstance(getApplicationContext());
-            int[] widgetIds = widgetManager.getAppWidgetIds(
-                    new ComponentName(getApplicationContext(), com.android.alarmclock.DigitalAppWidgetProvider.class));
-            Intent update = new Intent(getApplicationContext(), com.android.alarmclock.DigitalAppWidgetProvider.class);
-            update.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-            update.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds);
-            getApplicationContext().sendBroadcast(update);
-        } else if (KEY_SHOW_STATUS_BAR_ICON.equals(pref.getKey())) {
-            // Check if any alarms are active. If yes and
-            // we allow showing the alarm icon, the icon will be shown.
-            Alarms.updateStatusBarIcon(getApplicationContext(), (Boolean) newValue);
         }
         return true;
+    }
+
+    @Override
+    protected boolean isValidFragment(String fragmentName) {
+        // Exported activity but no headers we support.
+        return false;
     }
 
     private void updateAutoSnoozeSummary(ListPreference listPref,
@@ -225,12 +191,6 @@ public class SettingsActivity extends PreferenceActivity
         } else {
             listPref.setSummary(getString(R.string.auto_silence_summary, i));
         }
-    }
-
-    private void updateActionSummary(ListPreference listPref, String action, int summaryResId) {
-        int i = Integer.parseInt(action);
-        listPref.setSummary(getString(summaryResId,
-            getResources().getStringArray(R.array.action_summary_entries)[i]));
     }
 
     private void notifyHomeTimeZoneChanged() {
@@ -260,26 +220,6 @@ public class SettingsActivity extends PreferenceActivity
         listPref = (ListPreference) findPreference(KEY_VOLUME_BUTTONS);
         listPref.setSummary(listPref.getEntry());
         listPref.setOnPreferenceChangeListener(this);
-
-        listPref = (ListPreference) findPreference(KEY_FLIP_ACTION);
-        updateActionSummary(listPref, listPref.getValue(), R.string.flip_action_summary);
-        listPref.setOnPreferenceChangeListener(this);
-
-        listPref = (ListPreference) findPreference(KEY_SHAKE_ACTION);
-        updateActionSummary(listPref, listPref.getValue(), R.string.shake_action_summary);
-        listPref.setOnPreferenceChangeListener(this);
-
-        CheckBoxPreference hideStatusbarIcon = (CheckBoxPreference) findPreference(KEY_SHOW_STATUS_BAR_ICON);
-        hideStatusbarIcon.setOnPreferenceChangeListener(this);
-
-        ColorPickerPreference clockTimeColor = (ColorPickerPreference) findPreference(KEY_DIGITAL_CLOCK_TIME_COLOR);
-        clockTimeColor.setOnPreferenceChangeListener(this);
-
-        ColorPickerPreference clockDateColor = (ColorPickerPreference) findPreference(KEY_DIGITAL_CLOCK_DATE_COLOR);
-        clockDateColor.setOnPreferenceChangeListener(this);
-
-        ColorPickerPreference clockAlarmColor = (ColorPickerPreference) findPreference(KEY_DIGITAL_CLOCK_ALARM_COLOR);
-        clockAlarmColor.setOnPreferenceChangeListener(this);
 
         SnoozeLengthDialog snoozePref = (SnoozeLengthDialog) findPreference(KEY_ALARM_SNOOZE);
         snoozePref.setSummary();
@@ -342,11 +282,13 @@ public class SettingsActivity extends PreferenceActivity
         Resources resources = this.getResources();
         String[] ids = resources.getStringArray(R.array.timezone_values);
         String[] labels = resources.getStringArray(R.array.timezone_labels);
+        int minLength = ids.length;
         if (ids.length != labels.length) {
-            Log.wtf("Timezone ids and labels have different length!");
+            minLength = Math.min(minLength, labels.length);
+            Log.e("Timezone ids and labels have different length!");
         }
         List<TimeZoneRow> timezones = new ArrayList<TimeZoneRow>();
-        for (int i = 0; i < ids.length; i++) {
+        for (int i = 0; i < minLength; i++) {
             timezones.add(new TimeZoneRow(ids[i], labels[i]));
         }
         Collections.sort(timezones);
