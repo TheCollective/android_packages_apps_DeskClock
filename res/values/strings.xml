@@ -814,5 +814,12 @@
     <string name="no_alarms">No Alarms</string>
     <!-- String for no enabled alarms in timeline view [CHAR LIMIT=30] -->
     <string name="no_upcoming_alarms">NO UPCOMING ALARMS</string>
+
+    <!-- Label for AOCP clock gadget, shown in list of all gadgets -->
+    <string name="analog_aocp_gadget">AOCP clock</string>
+    
+    <!-- Appears at the top of the AOCP Clock Picker screen: Tell user to
+         select a clock Dial to display -->
+    <string name="clock_dial_instructions">Choose a clock dial</string>
 </resources>
 

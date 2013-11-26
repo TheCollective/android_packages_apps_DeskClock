@@ -139,6 +139,23 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/analog_appwidget" />
         </receiver>
 
+        <receiver android:name="com.android.alarmclock.AnalogAOCPAppWidgetProvider" android:label="@string/analog_aocp_gadget"
+        	android:icon="@mipmap/ic_widget_analog_aocp_clock">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.appwidget.action.APPWIDGET_DELETED" />
+                <action android:name="android.appwidget.action.APPWIDGET_DISABLED" />
+                <action android:name="android.appwidget.action.APPWIDGET_ENABLED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/analog_aocp_appwidget" />
+        </receiver>
+
+        <activity android:name="com.android.alarmclock.AnalogAOCPAppWidgetConfigure">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
+            </intent-filter>
+        </activity>
+
         <receiver android:name="com.android.alarmclock.DigitalAppWidgetProvider" android:label="@string/digital_gadget"
            android:icon="@mipmap/ic_launcher_alarmclock">
             <intent-filter>

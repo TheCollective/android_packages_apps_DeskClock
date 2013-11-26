@@ -23,7 +23,7 @@
 
     <style name="DeskClock" parent="android:Theme.Holo">
         <item name="android:windowActionBarOverlay">true</item>
-        <item name="android:windowBackground">@color/blackish</item>
+        <item name="android:windowBackground">@drawable/background_holo_dark</item>
         <item name="android:actionBarTabStyle">@style/DeskClockTabStyle</item>
         <item name="android:actionBarStyle">@style/DeskClockBarStyle</item>
         <item name="android:actionBarTabBarStyle">@style/DeskClockTabBarStyle</item>
@@ -55,7 +55,7 @@
     </style>
 
     <style name="AlarmClockTheme" parent="@android:style/Theme.Holo">
-        <item name="android:windowBackground">@color/blackish</item>
+        <item name="android:windowBackground">@drawable/background_holo_dark</item>
         <item name="android:actionBarStyle">@style/SettingsTheme.ActionBar</item>
         <item name="android:dropDownListViewStyle">@style/DeskClockDropDownListView</item>
         <item name="android:selectableItemBackground">@drawable/item_background</item>
