@@ -24,8 +24,11 @@ import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
@@ -44,7 +47,7 @@ import java.util.Locale;
 
 public class DigitalAppWidgetProvider extends AppWidgetProvider {
     private static final String TAG = "DigitalAppWidgetProvider";
-
+    private SharedPreferences mPrefs;
     /**
      * Intent to be used for checking if a world clock's date has changed. Must be every fifteen
      * minutes because not all time zones are hour-locked.
@@ -170,7 +173,8 @@ public class DigitalAppWidgetProvider extends AppWidgetProvider {
         refreshAlarm(context, widget);
         WidgetUtils.setTimeFormat(widget, 0/*no am/pm*/, R.id.the_clock);
         WidgetUtils.setClockSize(context, widget, ratio);
-
+        mPrefs =  PreferenceManager.getDefaultSharedPreferences(context);
+        WidgetUtils.setClockColor(context, widget, mPrefs);
         // Set today's date format
         CharSequence dateFormat = DateFormat.getBestDateTimePattern(Locale.getDefault(),
                 context.getString(R.string.abbrev_wday_month_day_no_year));
